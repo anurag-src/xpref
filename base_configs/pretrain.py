@@ -26,7 +26,13 @@ def get_config():
   # General experiment params.
   # ============================================== #
   # The root directory where experiments will be saved.
-  config.root_dir = "/tmp/xirl/pretrain_runs/"
+
+  # NOTE: Replaced Dataset Directory with the Documents directory, which has file permanence
+  config.root_dir = "~/Documents/xprefs/pretrain_runs/"
+  # config.root_dir = "/tmp/xirl/pretrain_runs/"
+
+
+
   # Rng seed. Set this to `none` to disable seeding.
   config.seed = 1
   # cudnn-related parameters that affect reproducibility.
@@ -45,7 +51,11 @@ def get_config():
   config.data = ml_collections.ConfigDict()
 
   # Absolute path to the dataset root.
-  config.data.root = "/tmp/xirl/datasets/xmagical/"
+
+  # NOTE: Replaced Dataset Directory with the Documents directory, which has file permanence
+  config.data.root = "~/Documents/xprefs/xmagical/"
+  # config.data.root = "/tmp/xirl/datasets/xmagical/"  # Uncomment for original XIRL config
+
   # The mini-batch size. Note this only specifies the number of videos to
   # load frames from in a single batch. The effective batch size is actually
   # larger since we sample multiple frame sequences per video.

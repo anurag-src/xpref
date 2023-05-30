@@ -16,6 +16,7 @@
 """Default pretraining config values."""
 
 import ml_collections
+import os
 
 
 def get_config():
@@ -28,9 +29,8 @@ def get_config():
   # The root directory where experiments will be saved.
 
   # NOTE: Replaced Dataset Directory with the Documents directory, which has file permanence
-  config.root_dir = "~/Documents/xprefs/pretrain_runs/"
+  config.root_dir = os.path.expanduser("~/Documents/xprefs/pretrain_runs/")
   # config.root_dir = "/tmp/xirl/pretrain_runs/"
-
 
 
   # Rng seed. Set this to `none` to disable seeding.
@@ -53,7 +53,7 @@ def get_config():
   # Absolute path to the dataset root.
 
   # NOTE: Replaced Dataset Directory with the Documents directory, which has file permanence
-  config.data.root = "~/Documents/xprefs/xmagical/"
+  config.data.root = os.path.expanduser("~/Documents/xprefs/xmagical/")
   # config.data.root = "/tmp/xirl/datasets/xmagical/"  # Uncomment for original XIRL config
 
   # The mini-batch size. Note this only specifies the number of videos to

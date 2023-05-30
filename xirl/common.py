@@ -61,9 +61,9 @@ def get_pretraining_dataloaders(
 
 
 def get_downstream_dataloaders(
-    config,
-    debug = False,
-):
+        config: object,
+        debug: object = False,
+) -> object:
   """Construct a train/valid pair of downstream dataloaders.
 
   Args:

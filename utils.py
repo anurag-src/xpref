@@ -54,7 +54,7 @@ def setup_experiment(exp_dir, config, resume = False):
   if os.path.exists(exp_dir):
     if not resume:
       raise ValueError(
-          "Experiment already exists. Run with --resume to continue.")
+          f"Experiment already exists at {exp_dir}. Run with --resume to continue.")
     load_config_from_dir(exp_dir, config)
   else:
     os.makedirs(exp_dir)

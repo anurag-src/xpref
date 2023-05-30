@@ -15,6 +15,7 @@
 
 """X-MAGICAL cross-embodiment pretraining script."""
 
+import os
 import os.path as osp
 import subprocess
 
@@ -47,6 +48,7 @@ flags.DEFINE_enum(
     "Which embodiment to train. Will train all sequentially if not specified.")
 flags.DEFINE_bool("unique_name", False,
                   "Whether to append a unique ID to the experiment name.")
+flags.DEFINE_string("device", "cuda:0", "The compute device.")
 
 
 def main(_):
@@ -83,13 +85,15 @@ def main(_):
             f"{repr(trainable_embs)}",
             "--config.data.max_vids_per_class",
             f"{MAX_DEMONSTRATIONS}",
+            "--device",
+            f"{FLAGS.device}"
         ],
         check=True,
     )
 
     # Note: This assumes that the config.root_dir value has not been
     # changed to its default value of 'tmp/xirl/pretrain_runs/'.
-    exp_path = osp.join("/tmp/xirl/pretrain_runs/", experiment_name)
+    exp_path = os.path.expanduser("~/Documents/xprefs/pretrain_runs/")
 
     # The 'goal_classifier' baseline does not need to compute a goal embedding.
     if FLAGS.algo != "goal_classifier":

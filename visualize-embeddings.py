@@ -64,6 +64,7 @@ if __name__ == "__main__":
     A_class = []
     A_traj = []
     A_embodiments = []
+    A_time = []
 
     print("Start A Embeddings")
     for i, embedding in enumerate(outs_A):
@@ -73,6 +74,7 @@ if __name__ == "__main__":
             A_traj.append(i)
             A_class.append(1)
             A_embodiments.append(_class)
+            A_time.append(j)
 
     print("A Embeddings Done!")
     print(len(A_embed_frames))
@@ -81,6 +83,7 @@ if __name__ == "__main__":
     B_class = []
     B_traj = []
     B_embodiments = []
+    B_time = []
     print("Start B Embeddings")
     for i, embedding in enumerate(outs_B):
         _class = i % 4
@@ -89,20 +92,25 @@ if __name__ == "__main__":
             B_traj.append(i)
             B_class.append(0)
             B_embodiments.append(_class)
+            B_time.append(j)
     print("B Embeddings Done!")
 
     all_embeddings = A_embed_frames + B_embed_frames
     all_classes = A_class + B_class
     all_traj = A_traj + B_traj
     all_embodiments = A_embodiments + B_embodiments
+    all_time = A_time + B_time
 
     print(all_embeddings)
 
     all_embeddings_np = np.array(all_embeddings)
-    embed_to_2d = TSNE(n_components=2, learning_rate='auto', init='random', perplexity=5, method="exact").fit_transform(all_embeddings_np)
+    embed_to_2d = TSNE(n_components=2, learning_rate='auto', init='random', perplexity=30, method="exact").fit_transform(all_embeddings_np)
     print(embed_to_2d)
 
-    colors = [(0, 1 - (0.1 * all_embodiments[i]), 0) if all_classes[i] == 1 else (1 - (0.1 * all_embodiments[i]), 0, 0) for i in range(len(all_classes))]
+    # colors = [(0, 1 - (0.1 * all_embodiments[i]), 0) if all_classes[i] == 1 else (1 - (0.1 * all_embodiments[i]), 0, 0) for i in range(len(all_classes))]
+    g_colors = [(0.0, min(0.2 + (0.01 * all_time[i]), 1.0), 0.0) for i in range(len(A_time))]
+    r_colors = [(min(0.2 + (0.01 * all_time[i]), 1.0), 0.0, 0.0) for i in range(len(B_time))]
+    colors = g_colors + r_colors
 
     plt.scatter(embed_to_2d[:,0], embed_to_2d[:,1], c=colors)
     plt.title("Embedded Trajectories in t-SNE 2D")

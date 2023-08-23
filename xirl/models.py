@@ -27,7 +27,8 @@ import torch.nn.functional as F
 from torchvision import models
 from torchvision.models.resnet import BasicBlock
 from torchvision.models.resnet import ResNet
-from torchvision.models.utils import load_state_dict_from_url
+#from torchvision.models.utils import load_state_dict_from_url
+from torch.hub import load_state_dict_from_url
 
 
 @dataclasses.dataclass
@@ -163,6 +164,16 @@ class GoalClassifier(SelfSupervisedModel):
 
     # Classification head.
     self.encoder = nn.Linear(num_ftrs, 1)
+
+#### Reward Predictor Class
+class PreferenceRewardPredictor(nn.Module):
+  def __init__(self, num_features = 32):
+    super().__init__()
+    self.predictor = nn.Sequential(
+      nn.Linear(num_features, 1)
+    )
+  def forward(self, x):
+    return self.predictor(x)
 
 
 class Resnet18RawImageNetFeaturesNet(SelfSupervisedModel):

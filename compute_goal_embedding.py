@@ -38,6 +38,7 @@ flags.DEFINE_boolean(
     "restore_checkpoint", True,
     "Restore model checkpoint. Disabling loading a checkpoint is useful if you "
     "want to measure performance at random initialization.")
+flags.DEFINE_string("device", "cuda:0", "The compute device.")
 
 ModelType = SelfSupervisedModel
 DataLoaderType = typing.Dict[str, torch.utils.data.DataLoader]

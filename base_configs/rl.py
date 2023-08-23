@@ -34,6 +34,8 @@ def get_config():
   # Main parameters.
   # ================================================= #
   config.save_dir = "/tmp/xirl/rl_runs/"
+  ### changing save_dir
+  #config.save_dir = "/home/masters3/Documents/Research/Xpref/rl/run_0.33/0/"
 
   # Set this to True to allow CUDA to find the best convolutional algorithm to
   # use for the given parameters. When False, cuDNN will deterministically

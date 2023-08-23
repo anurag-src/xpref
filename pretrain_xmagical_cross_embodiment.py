@@ -93,7 +93,7 @@ def main(_):
 
     # Note: This assumes that the config.root_dir value has not been
     # changed to its default value of 'tmp/xirl/pretrain_runs/'.
-    exp_path = os.path.expanduser("~/Documents/xprefs/pretrain_runs/")
+    exp_path = os.path.expanduser("~/Documents/Research/Xpref/pretrain_runs/")
 
     # The 'goal_classifier' baseline does not need to compute a goal embedding.
     if FLAGS.algo != "goal_classifier":

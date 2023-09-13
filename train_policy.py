@@ -119,6 +119,9 @@ def main(_):
         save_dir=osp.join(exp_dir, "video", "eval"),
     )
 
+    env = utils.wrap_learned_reward(env, FLAGS.config)
+    eval_env = utils.wrap_learned_reward(eval_env, FLAGS.config)
+
     # Dynamically set observation and action space values.
     config.sac.obs_dim = env.observation_space.shape[0]
     config.sac.action_dim = env.action_space.shape[0]
@@ -145,6 +148,7 @@ def main(_):
     )
 
     logger = Logger(osp.join(exp_dir, "tb"), FLAGS.resume)
+
 
     try:
         start = checkpoint_manager.restore_or_initialize()

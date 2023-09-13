@@ -29,7 +29,7 @@ def get_config():
   # The root directory where experiments will be saved.
 
   # NOTE: Replaced Dataset Directory with the Documents directory, which has file permanence
-  config.root_dir = os.path.expanduser("~/Documents/Research/Xpref/pretrain_runs/")
+  config.root_dir = os.path.expanduser("~/Documents/Xpref/pretrain_runs/")
   # config.root_dir = "/tmp/xirl/pretrain_runs/"
 
 

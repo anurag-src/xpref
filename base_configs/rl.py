@@ -16,7 +16,7 @@
 """Default SAC config values."""
 
 import ml_collections
-
+import os
 
 def get_config():
   """Returns default config."""
@@ -33,7 +33,7 @@ def get_config():
   # ================================================= #
   # Main parameters.
   # ================================================= #
-  config.save_dir = "/tmp/xirl/rl_runs/"
+  config.save_dir = os.path.expanduser("~/Documents/Xpref/pretrain_runs/")
   ### changing save_dir
   #config.save_dir = "/home/masters3/Documents/Research/Xpref/rl/run_0.33/0/"
 
@@ -52,9 +52,11 @@ def get_config():
   config.frame_stack = 3
 
   config.reward_wrapper = ml_collections.ConfigDict()
-  config.reward_wrapper.pretrained_path = ""
-  # Can be one of ['distance_to_goal', 'goal_classifier'].
-  config.reward_wrapper.type = "distance_to_goal"
+  # config.reward_wrapper.pretrained_path = "/home/connor/Documents/xprefs/pretrain_runs/dataset=xmagical_mode=cross_algo=xirl_embodiment=mediumstick/"
+  config.reward_wrapper.pretrained_path = "/home/connor/Documents/xprefs/pretrain_runs/anu_trained_tcc/"
+
+  # Can be one of ['distance_to_goal', 'goal_classifier', 'reward_prediction_from_prefs'].
+  config.reward_wrapper.type = "reward_prediction_from_prefs"
 
   # ================================================= #
   # Training parameters.

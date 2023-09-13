@@ -25,7 +25,7 @@ import gym
 import imageio
 import numpy as np
 import torch
-from xirl.models import SelfSupervisedModel
+from xirl.models import SelfSupervisedModel, PreferenceRewardPredictor
 
 import cv2
 
@@ -325,3 +325,33 @@ class GoalClassifierLearnedVisualReward(LearnedVisualReward):
     image_tensor = self._to_tensor(image)
     prob = torch.sigmoid(self._model.infer(image_tensor).embs)
     return prob.item()
+
+"""
+C.M. -- Create a Reward Wrapper that takes in both an embedding model and a reward prediction model based
+on the embedding
+"""
+class InferredFromEmbeddingReward(LearnedVisualReward):
+  def __init__(
+      self,
+      reward_network,
+      **base_kwargs,
+  ):
+    """Constructor.
+
+    Args:
+      reward_network: A path to a pretrained reward network of type PreferenceRewardPredictor.
+      **base_kwargs: Base keyword arguments.
+    """
+    super().__init__(**base_kwargs)
+
+    self.reward_predictor = PreferenceRewardPredictor()
+    cp = torch.load(reward_network)
+    self.reward_predictor.load_state_dict(cp["model_state_dict"])
+    self.reward_predictor.eval()
+
+  def _get_reward_from_image(self, image):
+    """Forward the pixels through the model and compute the reward."""
+    image_tensor = self._to_tensor(image)
+    embs = self._model.infer(image_tensor).embs
+    reward = -self.reward_predictor.forward(embs)
+    return reward.item()

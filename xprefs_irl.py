@@ -116,20 +116,41 @@ def train_tcc():
         model=model,
         optimizer=optimizer,
     )
-    global_step = checkpoint_manager.restore_or_initialize()
-    complete = False
 
     batch_loaders = {
         "train": load_dataset("train", debug=False),
         "valid": load_dataset("valid", debug=False)
     }
 
+    global_step = checkpoint_manager.restore_or_initialize()
+    total_batches = max(1, len(batch_loaders["train"]))
+    epoch = int(global_step / total_batches)
+    complete = False
+
     criterion = tcc_loss
+    iter_start_time = time.time()
     try:
         while not complete:
             for batch in batch_loaders["train"]:
-                loss = train_one_iteration(model, optimizer, criterion, batch, device)
-                print(loss.item())
+                train_loss = train_one_iteration(model, optimizer, criterion, batch, device)
+
+                if not global_step % CONFIG.checkpointing_frequency:
+                    checkpoint_manager.save(global_step)
+
+                global_step += 1
+                if global_step > CONFIG.optim.train_max_iters:
+                    complete = True
+                    break
+
+                print("Iter[{}/{}] (Epoch {}), {:.6f}s/iter, Loss: {:.3f}".format(
+                global_step,
+                    CONFIG.optim.train_max_iters,
+                    epoch,
+                    time.time() - iter_start_time,
+                    train_loss.item(),
+                ))
+                iter_start_time = time.time()
+            epoch += 1
 
     except KeyboardInterrupt:
         print("Caught keyboard interrupt. Saving model before quitting.")

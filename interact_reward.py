@@ -26,7 +26,7 @@ import matplotlib.pyplot as plt
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_enum("embodiment", "longstick", EMBODIMENTS,
+flags.DEFINE_enum("embodiment", "shortstick", EMBODIMENTS,
                   "The agent embodiment.")
 flags.DEFINE_boolean(
     "exit_on_done", True,

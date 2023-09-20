@@ -26,7 +26,7 @@ from xirl import models
 from xirl import trainers
 from xirl import transforms
 from xirl import video_samplers
-from xirl.dataset import VideoDataset, GoalExampleDataset
+from xirl.dataset import VideoDataset, GoalExampleDataset, FullTrajectoryDataset
 from xirl.file_utils import get_subdirs
 from xirl.types import SequenceType
 
@@ -334,5 +334,52 @@ def goal_dataset_from_config(config, goal_data_root, limit_per_embodiment, downs
         dataset_path,
         c_action_class,
         limit_per_type=limit_per_embodiment,
+        augmentor=augmentor
+    )
+
+def full_dataset_from_config(config, downstream, split, debug):
+    """Create a video dataset from a config."""
+    dataset_path = osp.join(config.data.root, split)
+
+    image_size = config.data_augmentation.image_size
+    if isinstance(image_size, int):
+        image_size = (image_size, image_size)
+    image_size = tuple(image_size)
+
+    # Note(kevin): We used to disable data augmentation on all downstream
+    # dataloaders. I've decided to keep them for train downstream loaders.
+    if debug:
+        # The minimum data augmentation we want to keep is resizing when
+        # debugging.
+        aug_names = ["global_resize"]
+    else:
+        if split == "train":
+            aug_names = config.data_augmentation.train_transforms
+        else:
+            aug_names = config.data_augmentation.eval_transforms
+
+    # Create a list of data augmentation callables.
+    aug_funcs = []
+    for name in aug_names:
+        if "resize" in name or "crop" in name:
+            aug_funcs.append(create_transform(name, *image_size))
+        else:
+            aug_funcs.append(create_transform(name))
+
+    augmentor = transforms.VideoAugmentor({SequenceType.FRAMES: aug_funcs})
+
+    # Restrict action classes if they have been provided. Else, load all
+    # from the data directory.
+    c_action_class = (
+        config.data.downstream_action_class
+        if downstream else config.data.pretrain_action_class)
+
+    # We need to separate out the dataclasses for each action class when
+    # creating downstream datasets.
+    frame_sampler = frame_sampler_from_config(config, downstream=True)
+    return FullTrajectoryDataset(
+        dataset_path,
+        c_action_class,
+        frame_sampler,
         augmentor=augmentor
     )

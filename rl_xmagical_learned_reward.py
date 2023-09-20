@@ -32,6 +32,7 @@ FLAGS = flags.FLAGS
 flags.DEFINE_string("pretrained_path", None, "Path to pretraining experiment.")
 flags.DEFINE_list("seeds", [0, 5], "List specifying the range of seeds to run.")
 flags.DEFINE_string("device", "cuda:0", "The compute device.")
+flags.DEFINE_boolean("resume", False, "Whether to resume training.")
 
 
 def main(_):
@@ -43,7 +44,7 @@ def main(_):
     else:
       reward_type = "distance_to_goal"
 
-    reward_type = "reward_prediction_from_prefs"
+    # reward_type = "reward_prediction_from_prefs"
 
     # Map the embodiment to the x-MAGICAL env name.
     env_name = XMAGICAL_EMBODIMENT_TO_ENV_NAME[kwargs["embodiment"]]
@@ -79,6 +80,8 @@ def main(_):
                 "--seed",
                 f"{seed}",
                 "--device",
+                f"{FLAGS.device}",
+                "--resume",
                 f"{FLAGS.device}",
             ]))
 

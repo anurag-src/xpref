@@ -5,26 +5,53 @@ The model follows the same architecture as TCC.
 import os
 import time
 import torch
+import yaml
 from torchvision.datasets import ImageFolder
 from configs.xmagical.pretraining.tcc import get_config
 from xirl import factory
 from torchkit import CheckpointManager
 from xirl.losses import compute_tcc_loss
 import pandas as pd
+import matplotlib.pyplot as plt
+from ml_collections import config_dict
+
+ConfigDict = config_dict.ConfigDict
 
 # XIRL_CONFIG_FILE = "base_configs/pretrain.py"
 CONFIG = get_config()
-X_MAGICAL_DATA_PATH = os.path.expanduser("~/Documents/Xpref/xmagical")
+X_MAGICAL_DATA_PATH = os.path.expanduser("~/Documents/Xpref/xmagical_0.5")
 CONFIG.data.root = X_MAGICAL_DATA_PATH
 
 GOALSET_PATH = os.path.expanduser("~/Documents/Xpref/goal_examples")
 LIM_GOALS_PER_EMBODIMENT = 10
 EXPERIMENT_DIRECTORY = os.path.expanduser("~/Documents/Xpref/experiments")
-LOAD_CHECKPOINT = None
+LOAD_CHECKPOINT = "/home/connor/Documents/Xpref/experiments/09-19-23-TCCandXprefs"
+
+if LOAD_CHECKPOINT:
+    CONFIG.optim.train_max_iters = 5000
 
 TRAIN_EMBODIMENTS = tuple(["gripper", "shortstick", "mediumstick"])
 CONFIG.data.pretrain_action_class = TRAIN_EMBODIMENTS
 CONFIG.data.down_stream_action_class = TRAIN_EMBODIMENTS
+
+PREFERENCES_FILE = os.path.expanduser("~/Documents/Xpref/prefs_50.csv")
+REMOVE_FROM_PREFERENCES = "longstick"
+
+BATCH_SIZE = 5
+MAX_TRAINING_PREFS = 5000
+MAX_TESTING_PREFS = 200
+EVAL_EVERY = 500
+
+def load_preferences(split_type="train"):
+    df = pd.read_csv(PREFERENCES_FILE)
+    df.columns = ["o1", "o2", "embodiment"]
+    # Remove the withheld embodiment from preference data
+    df = df.loc[df["embodiment"] != REMOVE_FROM_PREFERENCES]
+    if split_type == "train":
+        df = df.head(MAX_TRAINING_PREFS)
+    elif split_type == "valid":
+        df = df.tail(MAX_TESTING_PREFS)
+    return df
 
 def load_device():
     device = (
@@ -37,7 +64,7 @@ def load_device():
     # device = "cpu"
     return device
 
-def load_dataset(split_type="Train", debug=False):
+def load_dataset(split_type="train", debug=False):
     dataset = factory.dataset_from_config(CONFIG, False, split_type, debug)
     batch_sampler = factory.video_sampler_from_config(
         CONFIG, dataset.dir_tree, downstream=False, sequential=debug)
@@ -48,6 +75,15 @@ def load_dataset(split_type="Train", debug=False):
         num_workers=4 if torch.cuda.is_available() and not debug else 0,
         pin_memory=torch.cuda.is_available() and not debug,
     )
+
+def load_preference_dataset(split_type="train", debug=False):
+    dataset = factory.full_dataset_from_config(CONFIG, False, split_type, debug)
+    return dataset
+
+def get_ith_from_preferences(preferences, dataset, i):
+    data_row = preferences.iloc[i]
+    o1, o2, e = int(data_row["o1"]), int(data_row["o2"]), data_row["embodiment"]
+    return dataset.get_item(e, o1), dataset.get_item(e, o2)
 
 def load_goal_frames(split_type="Train", debug=False):
     """
@@ -105,6 +141,8 @@ def create_experiment_dir(name=None):
         name = str(int(time.time()))
     exp_dir = os.path.join(EXPERIMENT_DIRECTORY, name)
     os.makedirs(exp_dir)
+    with open(os.path.join(exp_dir, "config.yaml"), "w") as fp:
+        yaml.dump(ConfigDict.to_dict(CONFIG), fp)
     return exp_dir
 
 def eval_goal_embedding(model, goals):
@@ -141,6 +179,79 @@ def train_one_iteration(model, optimizer, criterion, batch, device="cuda"):
     loss.backward()
     optimizer.step()
     return loss
+
+def cumulative_r_from_traj(observation, model, goal_embedding, device, eval=False):
+    if eval:
+        model.eval()
+        with torch.no_grad():
+            o_frames = torch.stack([observation["frames"].to(device)])
+            embed_o = model(o_frames).embs.squeeze()
+            g_e = torch.squeeze(goal_embedding)
+            g_e = g_e.repeat(len(embed_o), 1)
+            goal_diff = g_e - embed_o
+            dist_to_reward_o = torch.norm(goal_diff, dim=1)
+            sum_reward_o = torch.sum(dist_to_reward_o)
+            return sum_reward_o
+
+    o_frames = torch.stack([observation["frames"].to(device)])
+    embed_o = model(o_frames).embs.squeeze()
+    g_e = torch.squeeze(goal_embedding)
+    g_e = g_e.repeat(len(embed_o), 1)
+    goal_diff = g_e - embed_o
+    dist_to_reward_o = torch.norm(goal_diff, dim=1)
+    sum_reward_o = torch.sum(dist_to_reward_o)
+
+    return sum_reward_o
+
+def train_xprefs_pair(model, optimizer, i, preferences, dataset, goal_embedding, device="cuda"):
+    """
+    Assumes o2 is preferred to o1
+    """
+    criterion = torch.nn.CrossEntropyLoss()
+    model.train()
+    optimizer.zero_grad()
+
+    reward_output_pairs = []
+
+    # Batch the inputs to the network before calculating loss
+    for j in range(i, i + BATCH_SIZE):
+        if j >= len(preferences):
+            break
+
+        o1, o2 = get_ith_from_preferences(preferences, dataset, j)
+
+        sum_reward_o1 = cumulative_r_from_traj(o1, model, goal_embedding, device)
+        sum_reward_o2 = cumulative_r_from_traj(o2, model, goal_embedding, device)
+
+        reward_output_pairs.append(torch.stack([sum_reward_o1, sum_reward_o2]))
+
+    # Cross entropy loss over summed rewards
+    loss = criterion(torch.stack(reward_output_pairs), torch.tensor([1 for _ in reward_output_pairs]).to(device))
+    loss.backward()
+    optimizer.step()
+    return loss
+
+def validation_xprefs(model, validation_prefs, dataset, eval_goal, device="cuda"):
+    print("Validating Test loss and accuracy...")
+    criterion = torch.nn.CrossEntropyLoss()
+    model.eval()
+    cumulative_loss = 0.0
+    total_correct, total_seen = 0, 0
+    for j in range(len(validation_prefs)):
+        o1, o2 = get_ith_from_preferences(validation_prefs, dataset, j)
+
+        sum_reward_o1 = cumulative_r_from_traj(o1, model, eval_goal, device)
+        sum_reward_o2 = cumulative_r_from_traj(o2, model, eval_goal, device)
+        reward_out_pair = [sum_reward_o1, sum_reward_o2]
+
+        loss = criterion(torch.stack(reward_out_pair), torch.tensor(1).to(device))
+        cumulative_loss += loss.item()
+
+        if sum_reward_o2 > sum_reward_o1:
+            total_correct += 1
+        total_seen += 1
+
+    return cumulative_loss / total_seen, total_correct / total_seen
 
 def eval_one_iteration(model, criterion, validation_set, num_iters=None, device="cuda"):
     with torch.no_grad():
@@ -185,7 +296,6 @@ def train_tcc():
 
     criterion = tcc_loss
     iter_start_time = time.time()
-    test_loss = torch.tensor(0)
 
     # Main Training Loop
     try:
@@ -224,9 +334,100 @@ def train_tcc():
 
     print("Training terminated.")
 
+def train_xprefs():
+    device = load_device()
+    print(f"Using {device} device")
+
+    model = load_model().to(device)
+    optimizer = load_tcc_optimizer(model)
+    if LOAD_CHECKPOINT is None:
+        exp_dir = create_experiment_dir()
+    else:
+        exp_dir = LOAD_CHECKPOINT
+
+    checkpoint_dir = os.path.join(exp_dir, "checkpoints")
+    checkpoint_manager = CheckpointManager(
+        checkpoint_dir,
+        model=model,
+        optimizer=optimizer,
+    )
+
+    preferences = load_preferences()
+    full_traj_dataset = load_preference_dataset("train", debug=False)
+    valid_preferences_dataset = load_preferences("valid")
+
+    goal_examples_data = load_goal_frames("train", debug=False)
+
+    global_step = checkpoint_manager.restore_or_initialize()
+    # total_batches = max(1, len(batch_loaders["train"]))
+    epoch = 0
+    complete = False
+
+    criterion = tcc_loss
+    iter_start_time = time.time()
+
+    save_out = []
+
+    losses = []
+    plt.ion()
+
+    # Main Training Loop
+    try:
+        while not complete:
+            for batch_i in range(0, len(preferences), BATCH_SIZE):
+
+                eval_goal = eval_goal_embedding(model, goal_examples_data)
+                train_loss = train_xprefs_pair(model, optimizer, batch_i, preferences, full_traj_dataset, eval_goal, device)
+                print(f"Training Loss for step {global_step}: {train_loss.item()}")
+                losses.append(train_loss)
+
+                # plt.plot(losses)
+                # plt.pause(0.01)
+                # plt.title("XPrefs Training Loss")
+                # plt.ylabel("Loss")
+                # plt.xlabel("Batch Updates")
+                # plt.show()
+
+                if not global_step % CONFIG.checkpointing_frequency:
+                    checkpoint_manager.save(global_step)
+
+                if not global_step % EVAL_EVERY:
+
+                    eval_goal = eval_goal_embedding(model, goal_examples_data)
+                    test_loss = validation_xprefs(model, valid_preferences_dataset, full_traj_dataset, eval_goal, device=device)
+                    print("Iter[{}/{}] (Epoch {}), {:.6f}s/iter, Loss: {:.3f}, Test Loss: {:.3f}, Test Accuracy: {:3f}".format(
+                        global_step,
+                        CONFIG.optim.train_max_iters,
+                        epoch,
+                        time.time() - iter_start_time,
+                        train_loss.item(),
+                        test_loss[0],
+                        test_loss[1],
+                    ))
+                    save_out.append([global_step, epoch, train_loss.item(), test_loss[0], test_loss[1]])
+
+                global_step += 1
+                if global_step > CONFIG.optim.train_max_iters:
+                    complete = True
+                    break
+
+                iter_start_time = time.time()
+
+            epoch += 1
+
+    except KeyboardInterrupt:
+        print("Caught keyboard interrupt. Saving model before quitting.")
+
+    finally:
+        checkpoint_manager.save(global_step)
+        data_out = pd.DataFrame(save_out)
+        data_out.columns = ["steps", "epochs", "train_loss", "test_loss", "test_acc"]
+        data_out.to_csv(os.path.join(exp_dir, "embedding_train.csv"))
+
+    print("Training terminated.")
 
 if __name__ == "__main__":
-    train_tcc()
+    train_xprefs()
 
 
 

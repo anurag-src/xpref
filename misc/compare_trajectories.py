@@ -8,11 +8,12 @@ from torchkit import CheckpointManager
 CHECKPOINTS = {
     "TCC Only": "/home/connor/Documents/Xpref/experiments/09-19-23-TCCOnly",
     "TCC + XPrefs": "/home/connor/Documents/Xpref/experiments/09-19-23-TCCandXprefs",
-    "Xprefs Only": "/home/connor/Documents/Xpref/experiments/09-19-23-XPrefsOnly"
+    "Xprefs Only": "/home/connor/Documents/Xpref/experiments/09-26-23-XPrefsOnly"
 }
 
 EMBODIMENT_TARGET = "shortstick"
-TRAJECTORY_INDEX = 22
+GOOD_TRAJECTORY_INDEX = 23
+BAD_TRAJECTORY_INDEX = 1222
 GOALSET_PATH = os.path.expanduser("~/Documents/Xpref/goal_examples")
 LIM_GOALS_PER_EMBODIMENT = 10
 
@@ -28,8 +29,6 @@ def load_device():
     device = (
         "cuda"
         if torch.cuda.is_available()
-        else "mps"
-        if torch.backends.mps.is_available()
         else "cpu"
     )
     # device = "cpu"
@@ -52,9 +51,9 @@ def load_goal_frames(split_type="Train", debug=False):
         pin_memory=torch.cuda.is_available() and not debug,
     )
 
-def eval_goal_embedding(model, goals):
+def eval_goal_embedding(model, goals, device="cuda"):
     with torch.no_grad():
-        return calculate_goal_embedding(model, goals, eval=True)
+        return calculate_goal_embedding(model, goals, eval=True, device=device)
 
 def calculate_goal_embedding(model, goal_dataloader, eval=False, device="cuda"):
     if not eval:
@@ -99,21 +98,30 @@ def r_from_traj(observation, model, goal_embedding, device):
 
 
 if __name__ == "__main__":
-    traj_data = load_preference_dataset("valid", debug=False)
+    traj_data = load_preference_dataset("train", debug=False)
     goal_data = load_goal_frames("train")
     device = load_device()
-    observation = traj_data.get_item(EMBODIMENT_TARGET, TRAJECTORY_INDEX)
+    print(len(traj_data))
+    observation_1 = traj_data.get_item(EMBODIMENT_TARGET, GOOD_TRAJECTORY_INDEX)
+    observation_2 = traj_data.get_item(EMBODIMENT_TARGET, BAD_TRAJECTORY_INDEX)
     fig, axes = plt.subplots(nrows=len(CHECKPOINTS), ncols=1, sharex=True)
 
     i = 0
     for cp in CHECKPOINTS:
         m = load_model(CHECKPOINTS[cp]).to(device)
-        goal_embedding = eval_goal_embedding(m, goal_data)
-        rewards = r_from_traj(observation, m, goal_embedding, device=device)
-        x = [i for i in range(len(observation["frames"]))]
-        y = rewards.cpu().numpy()
-        axes[i].plot(x, y, label=cp.lower())
+        goal_embedding = eval_goal_embedding(m, goal_data, device=device)
+        rewards_1 = r_from_traj(observation_1, m, goal_embedding, device=device)
+        rewards_2 = r_from_traj(observation_2, m, goal_embedding, device=device)
+
+        x_1 = [i for i in range(len(observation_1["frames"]))]
+        x_2 = [i for i in range(len(observation_2["frames"]))]
+        y_1 = rewards_1.cpu().numpy()
+        y_2 = rewards_2.cpu().numpy()
+
+        axes[i].plot(x_1, y_1, label=cp.lower(), c="blue")
+        axes[i].plot(x_2, y_2, label=cp.lower(), c="red")
         axes[i].set_title(cp)
+        axes[i].set_ylim(min(min(y_1), min(y_2)), 0)
         i += 1
 
     plt.ylabel("Negative Distance to Goal")

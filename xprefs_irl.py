@@ -23,9 +23,10 @@ X_MAGICAL_DATA_PATH = os.path.expanduser("~/Documents/Xpref/xmagical_0.5")
 CONFIG.data.root = X_MAGICAL_DATA_PATH
 
 GOALSET_PATH = os.path.expanduser("~/Documents/Xpref/goal_examples")
-LIM_GOALS_PER_EMBODIMENT = 10
+LIM_GOALS_PER_EMBODIMENT = 50
 EXPERIMENT_DIRECTORY = os.path.expanduser("~/Documents/Xpref/experiments")
-LOAD_CHECKPOINT = "/home/connor/Documents/Xpref/experiments/09-19-23-TCCandXprefs"
+# LOAD_CHECKPOINT = "/home/connor/Documents/Xpref/experiments/09-19-23-TCCandXprefs"
+LOAD_CHECKPOINT = None
 
 if LOAD_CHECKPOINT:
     CONFIG.optim.train_max_iters = 5000
@@ -37,10 +38,10 @@ CONFIG.data.down_stream_action_class = TRAIN_EMBODIMENTS
 PREFERENCES_FILE = os.path.expanduser("~/Documents/Xpref/prefs_50.csv")
 REMOVE_FROM_PREFERENCES = "longstick"
 
-BATCH_SIZE = 5
-MAX_TRAINING_PREFS = 5000
-MAX_TESTING_PREFS = 200
-EVAL_EVERY = 500
+BATCH_SIZE = 15
+MAX_TRAINING_PREFS = 2000
+MAX_TESTING_PREFS = 100
+EVAL_EVERY = 50
 
 def load_preferences(split_type="train"):
     df = pd.read_csv(PREFERENCES_FILE)
@@ -57,8 +58,6 @@ def load_device():
     device = (
         "cuda"
         if torch.cuda.is_available()
-        else "mps"
-        if torch.backends.mps.is_available()
         else "cpu"
     )
     # device = "cpu"
@@ -102,7 +101,8 @@ def load_model():
     return factory.model_from_config(CONFIG)
 
 def load_tcc_optimizer(model):
-    return factory.optim_from_config(config=CONFIG, model=model)
+    return torch.optim.Adam(model.parameters(), lr=1e-3)
+    # return factory.optim_from_config(config=CONFIG, model=model)
 
 def load_trainer(model, optimizer, device):
     return factory.trainer_from_config(CONFIG, model, optimizer, device)
@@ -145,9 +145,9 @@ def create_experiment_dir(name=None):
         yaml.dump(ConfigDict.to_dict(CONFIG), fp)
     return exp_dir
 
-def eval_goal_embedding(model, goals):
+def eval_goal_embedding(model, goals, device="cuda"):
     with torch.no_grad():
-        return calculate_goal_embedding(model, goals, eval=True)
+        return calculate_goal_embedding(model, goals, eval=True, device=device)
 
 def calculate_goal_embedding(model, goal_dataloader, eval=False, device="cuda"):
     if not eval:
@@ -226,7 +226,7 @@ def train_xprefs_pair(model, optimizer, i, preferences, dataset, goal_embedding,
         reward_output_pairs.append(torch.stack([sum_reward_o1, sum_reward_o2]))
 
     # Cross entropy loss over summed rewards
-    loss = criterion(torch.stack(reward_output_pairs), torch.tensor([1 for _ in reward_output_pairs]).to(device))
+    loss = criterion(torch.stack(reward_output_pairs), torch.tensor([0 for _ in reward_output_pairs]).to(device))
     loss.backward()
     optimizer.step()
     return loss
@@ -244,10 +244,10 @@ def validation_xprefs(model, validation_prefs, dataset, eval_goal, device="cuda"
         sum_reward_o2 = cumulative_r_from_traj(o2, model, eval_goal, device)
         reward_out_pair = [sum_reward_o1, sum_reward_o2]
 
-        loss = criterion(torch.stack(reward_out_pair), torch.tensor(1).to(device))
+        loss = criterion(torch.stack(reward_out_pair), torch.tensor(0).to(device))
         cumulative_loss += loss.item()
 
-        if sum_reward_o2 > sum_reward_o1:
+        if sum_reward_o1 > sum_reward_o2:
             total_correct += 1
         total_seen += 1
 
@@ -302,7 +302,7 @@ def train_tcc():
         while not complete:
             for batch in batch_loaders["train"]:
                 train_loss = train_one_iteration(model, optimizer, criterion, batch, device)
-                eval_goal = eval_goal_embedding(model, goal_examples_data)
+                eval_goal = eval_goal_embedding(model, goal_examples_data, device=device)
 
                 if not global_step % CONFIG.checkpointing_frequency:
                     checkpoint_manager.save(global_step)
@@ -372,14 +372,14 @@ def train_xprefs():
     plt.ion()
 
     # Main Training Loop
+    RECOMPUTE_GOAL_AT = [100]
+    eval_goal = eval_goal_embedding(model, goal_examples_data)
     try:
         while not complete:
             for batch_i in range(0, len(preferences), BATCH_SIZE):
-
-                eval_goal = eval_goal_embedding(model, goal_examples_data)
                 train_loss = train_xprefs_pair(model, optimizer, batch_i, preferences, full_traj_dataset, eval_goal, device)
                 print(f"Training Loss for step {global_step}: {train_loss.item()}")
-                losses.append(train_loss)
+                # losses.append(train_loss.item())
 
                 # plt.plot(losses)
                 # plt.pause(0.01)
@@ -392,8 +392,7 @@ def train_xprefs():
                     checkpoint_manager.save(global_step)
 
                 if not global_step % EVAL_EVERY:
-
-                    eval_goal = eval_goal_embedding(model, goal_examples_data)
+                    # eval_goal = eval_goal_embedding(model, goal_examples_data)
                     test_loss = validation_xprefs(model, valid_preferences_dataset, full_traj_dataset, eval_goal, device=device)
                     print("Iter[{}/{}] (Epoch {}), {:.6f}s/iter, Loss: {:.3f}, Test Loss: {:.3f}, Test Accuracy: {:3f}".format(
                         global_step,
@@ -405,6 +404,10 @@ def train_xprefs():
                         test_loss[1],
                     ))
                     save_out.append([global_step, epoch, train_loss.item(), test_loss[0], test_loss[1]])
+
+                if global_step > 0 and global_step in RECOMPUTE_GOAL_AT:
+                    eval_goal = eval_goal_embedding(model, goal_examples_data)
+                    print(f"Goal Recompute: {eval_goal}")
 
                 global_step += 1
                 if global_step > CONFIG.optim.train_max_iters:
@@ -427,7 +430,7 @@ def train_xprefs():
     print("Training terminated.")
 
 if __name__ == "__main__":
-    train_xprefs()
+    train_tcc()
 
 
 

@@ -6,9 +6,11 @@ from xirl import factory
 from torchkit import CheckpointManager
 
 CHECKPOINTS = {
-    "TCC Only": "/home/connor/Documents/Xpref/experiments/09-19-23-TCCOnly",
-    "TCC + XPrefs": "/home/connor/Documents/Xpref/experiments/09-19-23-TCCandXprefs",
-    "Xprefs Only": "/home/connor/Documents/Xpref/experiments/09-26-23-XPrefsOnly"
+    "TCC Only (XMagical)": "/home/connor/Documents/Xpref/experiments/09-26-23-TCCXMagical",
+    "TCC Only (MQME 0.5)": "/home/connor/Documents/Xpref/experiments/09-26-23-TCCMQME",
+    "TCC + XPrefs (MQME 0.5)": "/home/connor/Documents/Xpref/experiments/09-26-23-TCCandXPrefs",
+    "Xprefs Only (Dynamic Goal $\phi$)" : "/home/connor/Documents/Xpref/experiments/09-26-23-XPrefsOnlyDynamicGoal",
+    "Xprefs Only (Static Goal $\phi$)" : "/home/connor/Documents/Xpref/experiments/09-26-23-XPrefsOnly"
 }
 
 EMBODIMENT_TARGET = "shortstick"

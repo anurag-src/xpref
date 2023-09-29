@@ -53,7 +53,7 @@ def get_config():
   # Absolute path to the dataset root.
 
   # NOTE: Replaced Dataset Directory with the Documents directory, which has file permanence
-  config.data.root = os.path.expanduser("~/Documents/Xpref/xmagical/")
+  config.data.root = os.path.expanduser("~/Documents/Xpref/trajectories/")
   # config.data.root = "/tmp/xirl/datasets/xmagical/"  # Uncomment for original XIRL config
 
   # The mini-batch size. Note this only specifies the number of videos to

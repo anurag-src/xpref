@@ -377,12 +377,12 @@ class FullTrajectoryDataset(Dataset):
             SequenceType.VIDEO_LEN: sample["vid_len"],
         }
 
-    def get_item(self, embodiment, idx):
+    def get_item(self, embodiment, idx, eval=False):
         embodiment_list = self.trajectories[embodiment]
         video_path = embodiment_list[idx]
 
         image = self._get_data(video_path)
-        if self.augmentor:
+        if not eval and self.augmentor:
             image = self.augmentor(image)
         image = self._totensor(image)
         return {

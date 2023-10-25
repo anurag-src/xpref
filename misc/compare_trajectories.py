@@ -6,16 +6,17 @@ from xirl import factory
 from torchkit import CheckpointManager
 
 CHECKPOINTS = {
-    "TCC Only (XMagical)": "/home/connor/Documents/Xpref/experiments/09-26-23-TCCXMagical",
-    "TCC Only (MQME 0.5)": "/home/connor/Documents/Xpref/experiments/09-26-23-TCCMQME",
-    "TCC + XPrefs (MQME 0.5)": "/home/connor/Documents/Xpref/experiments/09-26-23-TCCandXPrefs",
-    "Xprefs Only (Dynamic Goal $\phi$)" : "/home/connor/Documents/Xpref/experiments/09-26-23-XPrefsOnlyDynamicGoal",
-    "Xprefs Only (Static Goal $\phi$)" : "/home/connor/Documents/Xpref/experiments/09-26-23-XPrefsOnly"
+    # "TCC Only (XMagical)": "/home/connor/Documents/Xpref/experiments/09-26-23-TCCXMagical",
+    # "TCC Only (MQME 0.5)": "/home/connor/Documents/Xpref/experiments/09-26-23-TCCMQME",
+    # "TCC + XPrefs (MQME 0.5)": "/home/connor/Documents/Xpref/experiments/09-26-23-TCCandXPrefs",
+    # "Xprefs Only (Dynamic Goal $\phi$)" : "/home/connor/Documents/Xpref/experiments/09-26-23-XPrefsOnlyDynamicGoal",
+    "Xprefs Only (Static Goal $\phi$)" : "/home/connor/Documents/Xpref/experiments/10-02-23-Full-Data-Xprefs"
 }
 
-EMBODIMENT_TARGET = "shortstick"
-GOOD_TRAJECTORY_INDEX = 23
-BAD_TRAJECTORY_INDEX = 1222
+EMBODIMENT_TARGETS = ["shortstick", "longstick", "gripper"]
+GOOD_TRAJECTORY_INDEX = 18
+BAD_TRAJECTORY_INDEX = 22
+OTHER_TRAJECTORY_INDEX = 964
 GOALSET_PATH = os.path.expanduser("~/Documents/Xpref/goal_examples")
 LIM_GOALS_PER_EMBODIMENT = 10
 
@@ -24,7 +25,7 @@ EVAL_EMBODIMENTS = tuple(["gripper", "shortstick", "mediumstick", "longstick"])
 CONFIG.data.pretrain_action_class = EVAL_EMBODIMENTS
 CONFIG.data.down_stream_action_class = EVAL_EMBODIMENTS
 
-X_MAGICAL_DATA_PATH = os.path.expanduser("~/Documents/Xpref/xmagical_0.5")
+X_MAGICAL_DATA_PATH = os.path.expanduser("~/Documents/Xpref/trajectories")
 CONFIG.data.root = X_MAGICAL_DATA_PATH
 
 def load_device():
@@ -89,6 +90,7 @@ def load_model(checkpoint_dir):
     return m
 
 def r_from_traj(observation, model, goal_embedding, device):
+    model.eval()
     with torch.no_grad():
         o_frames = torch.stack([observation["frames"].to(device)])
         embed_o = model(o_frames).embs.squeeze()
@@ -100,12 +102,13 @@ def r_from_traj(observation, model, goal_embedding, device):
 
 
 if __name__ == "__main__":
-    traj_data = load_preference_dataset("train", debug=False)
+    traj_data = load_preference_dataset("valid", debug=False)
     goal_data = load_goal_frames("train")
     device = load_device()
     print(len(traj_data))
-    observation_1 = traj_data.get_item(EMBODIMENT_TARGET, GOOD_TRAJECTORY_INDEX)
-    observation_2 = traj_data.get_item(EMBODIMENT_TARGET, BAD_TRAJECTORY_INDEX)
+    observation_1 = traj_data.get_item(EMBODIMENT_TARGETS[0], GOOD_TRAJECTORY_INDEX, eval=False)
+    observation_2 = traj_data.get_item(EMBODIMENT_TARGETS[1], BAD_TRAJECTORY_INDEX, eval=False)
+    observation_3 = traj_data.get_item(EMBODIMENT_TARGETS[2], OTHER_TRAJECTORY_INDEX, eval=False)
     fig, axes = plt.subplots(nrows=len(CHECKPOINTS), ncols=1, sharex=True)
 
     i = 0
@@ -114,20 +117,33 @@ if __name__ == "__main__":
         goal_embedding = eval_goal_embedding(m, goal_data, device=device)
         rewards_1 = r_from_traj(observation_1, m, goal_embedding, device=device)
         rewards_2 = r_from_traj(observation_2, m, goal_embedding, device=device)
+        rewards_3 = r_from_traj(observation_3, m, goal_embedding, device=device)
 
         x_1 = [i for i in range(len(observation_1["frames"]))]
         x_2 = [i for i in range(len(observation_2["frames"]))]
+        x_3 = [i for i in range(len(observation_3["frames"]))]
+
         y_1 = rewards_1.cpu().numpy()
         y_2 = rewards_2.cpu().numpy()
+        y_3 = rewards_3.cpu().numpy()
 
-        axes[i].plot(x_1, y_1, label=cp.lower(), c="blue")
-        axes[i].plot(x_2, y_2, label=cp.lower(), c="red")
-        axes[i].set_title(cp)
-        axes[i].set_ylim(min(min(y_1), min(y_2)), 0)
+        try:
+            axes[i].plot(x_1, y_1, label=cp.lower(), c="blue")
+            axes[i].plot(x_2, y_2, label=cp.lower(), c="red")
+            axes[i].plot(x_3, y_3, label=cp.lower(), c="green")
+            axes[i].set_title(cp)
+            axes[i].set_ylim(min(min(y_1), min(y_2), min(y_3)), 0)
+        except TypeError:
+            axes.plot(x_1, y_1, label=f"{EMBODIMENT_TARGETS[0]}-{GOOD_TRAJECTORY_INDEX}", c="blue")
+            axes.plot(x_2, y_2, label=f"{EMBODIMENT_TARGETS[1]}-{BAD_TRAJECTORY_INDEX}", c="red")
+            axes.plot(x_3, y_3, label=f"{EMBODIMENT_TARGETS[2]}-{OTHER_TRAJECTORY_INDEX}", c="green")
+            axes.set_title(cp)
+            axes.set_ylim(min(min(y_1), min(y_2), min(y_3)), 0)
         i += 1
 
     plt.ylabel("Negative Distance to Goal")
     plt.xlabel("Trajectory Index")
+    plt.legend()
     # plt.title("Comparison of Inferred Reward over trajectory")
     plt.show()
 

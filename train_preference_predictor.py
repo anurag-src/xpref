@@ -66,7 +66,7 @@ def prepdata():
 def preppref():
     pref_dataset_path = "/home/masters3/Documents/Research/Xpref/demos/random_demos_goal_compute/xmagical_0.2/train/"
     #filenames = ["gripper.csv","longstick.csv","mediumstick.csv","shortstick.csv"]
-    filenames = ["longstick.csv","mediumstick.csv","shortstick.csv"]
+    filenames = ["longstick.csv", "mediumstick.csv", "shortstick.csv"]
     seed = 0
     np.random.seed(seed)  
     prefs = []
@@ -85,7 +85,7 @@ def preppref():
 def prepprefvalid():
     pref_dataset_path = "/home/masters3/Documents/Research/Xpref/demos/random_demos_goal_compute/xmagical_0.2/train/"
     #filenames = ["gripper.csv","longstick.csv","mediumstick.csv","shortstick.csv"]
-    filenames = ["longstick.csv","mediumstick.csv","shortstick.csv"]
+    filenames = ["longstick.csv", "mediumstick.csv", "shortstick.csv"]
     seed = 0
     np.random.seed(seed)  
     prefs = []

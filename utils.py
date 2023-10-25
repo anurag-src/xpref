@@ -217,7 +217,7 @@ def wrap_learned_reward(env, config):
 
     # Reward Predictor Network
     elif config.reward_wrapper.type == "reward_prediction_from_prefs":
-        kwargs["reward_network"] = "/home/connor/Documents/xprefs/model_99.pt"
+        kwargs["reward_network"] = "/home/connor/Documents/Xpref/experiments/10-02-23-Full-Data-Xprefs"
         env = wrappers.InferredFromEmbeddingReward(**kwargs)
 
     else:
@@ -269,7 +269,7 @@ def make_buffer(
         buffer = replay_buffer.ReplayBufferDistanceToGoal(**kwargs)
 
     elif config.reward_wrapper.type == "reward_prediction_from_prefs":
-        kwargs["reward_network"] = "/home/connor/Documents/xprefs/model_99.pt"
+        kwargs["reward_network"] = "/home/connor/Documents/Xpref/experiments/10-02-23-Full-Data-Xprefs"
         buffer = replay_buffer.ReplayBufferLearnedReward(**kwargs)
 
     else:

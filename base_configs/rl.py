@@ -53,10 +53,10 @@ def get_config():
 
   config.reward_wrapper = ml_collections.ConfigDict()
   # config.reward_wrapper.pretrained_path = "/home/connor/Documents/xprefs/pretrain_runs/dataset=xmagical_mode=cross_algo=xirl_embodiment=mediumstick/"
-  config.reward_wrapper.pretrained_path = "/home/connor/Documents/Xpref/experiments/1695074961"
+  config.reward_wrapper.pretrained_path = "/home/connor/Documents/Xpref/experiments/10-02-23-Full-Data-Xprefs"
 
   # Can be one of ['distance_to_goal', 'goal_classifier', 'reward_prediction_from_prefs'].
-  config.reward_wrapper.type = "distance_to_goal"
+  config.reward_wrapper.type = "reward_prediction_from_prefs"
 
   # ================================================= #
   # Training parameters.

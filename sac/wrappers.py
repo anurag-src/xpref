@@ -26,6 +26,7 @@ import imageio
 import numpy as np
 import torch
 from xirl.models import SelfSupervisedModel, PreferenceRewardPredictor
+from torchkit import CheckpointManager
 
 import cv2
 
@@ -344,14 +345,19 @@ class InferredFromEmbeddingReward(LearnedVisualReward):
     """
     super().__init__(**base_kwargs)
 
-    self.reward_predictor = PreferenceRewardPredictor()
-    cp = torch.load(reward_network)
-    self.reward_predictor.load_state_dict(cp["model_state_dict"])
+    device = "cpu"
+    self.reward_predictor = PreferenceRewardPredictor().to(device)
+    checkpoint_dir = os.path.join(reward_network, "checkpoints")
+    checkpoint_manager = CheckpointManager(
+      checkpoint_dir,
+      model=self.reward_predictor,
+    )
+    checkpoint_manager.restore_or_initialize()
     self.reward_predictor.eval()
 
   def _get_reward_from_image(self, image):
     """Forward the pixels through the model and compute the reward."""
     image_tensor = self._to_tensor(image)
     embs = self._model.infer(image_tensor).embs
-    reward = -self.reward_predictor.forward(embs)
+    reward = self.reward_predictor.forward(embs)
     return reward.item()

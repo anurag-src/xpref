@@ -25,6 +25,8 @@ from typing import Optional, Tuple
 import numpy as np
 import torch
 from xirl.models import SelfSupervisedModel, PreferenceRewardPredictor
+import os
+from torchkit import CheckpointManager
 
 import cv2
 
@@ -231,15 +233,19 @@ class ReplayBufferLearnedReward(ReplayBufferLearnedReward):
   ):
     super().__init__(**base_kwargs)
 
-    self.reward_predictor = PreferenceRewardPredictor()
-    cp = torch.load(reward_network)
-    self.reward_predictor.load_state_dict(cp["model_state_dict"])
-    self.reward_predictor.eval()
+    device = "cpu"
+    self.reward_predictor = PreferenceRewardPredictor().to(device)
+    checkpoint_dir = os.path.join(reward_network, "checkpoints")
+    checkpoint_manager = CheckpointManager(
+      checkpoint_dir,
+      model=self.reward_predictor,
+    )
+    checkpoint_manager.restore_or_initialize()
 
   def _get_reward_from_image(self):
     """Forward the pixels through the model and compute the reward."""
     image_tensors = [self._pixel_to_tensor(i) for i in self.pixels_staging]
     image_tensors = torch.cat(image_tensors, dim=1)
     embs = self.model.infer(image_tensors).embs
-    reward = -1.0 * self.reward_predictor.forward(embs)
+    reward = self.reward_predictor.forward(embs)
     return reward.detach().numpy()

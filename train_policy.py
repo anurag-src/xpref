@@ -56,22 +56,34 @@ def evaluate(
         policy,
         env,
         num_episodes,
+        train_step=0
 ):
     """Evaluate the policy and dump rollout videos to disk."""
     policy.eval()
     stats = collections.defaultdict(list)
+
+    eval_gt = []
+    eval_learned_r = []
     for _ in range(num_episodes):
         observation, done = env.reset(), False
+        episode_learned_rewards = []
+        episode_gt_rewards = []
         while not done:
             action = policy.act(observation, sample=False)
-            observation, _, done, info = env.step(action)
+            observation, reward, done, info = env.step(action)
+            episode_learned_rewards.append(reward)
+            episode_gt_rewards.append(info["env_reward"])
+
+        eval_gt.append(sum(episode_gt_rewards))
+        eval_learned_r.append(sum(episode_learned_rewards))
         for k, v in info["episode"].items():
             stats[k].append(v)
         if "eval_score" in info:
             stats["eval_score"].append(info["eval_score"])
     for k, v in stats.items():
         stats[k] = np.mean(v)
-    return stats
+
+    return stats, [np.mean(eval_gt), np.mean(eval_learned_r), train_step]
 
 
 @experiment.pdb_fallback
@@ -149,7 +161,7 @@ def main(_):
 
     logger = Logger(osp.join(exp_dir, "tb"), FLAGS.resume)
 
-
+    output_tracking = []
     try:
         start = checkpoint_manager.restore_or_initialize()
         observation, done = env.reset(), False
@@ -194,7 +206,8 @@ def main(_):
                     logger.flush()
 
             if (i + 1) % config.eval_frequency == 0:
-                eval_stats = evaluate(policy, eval_env, config.num_eval_episodes)
+                eval_stats, csv_line = evaluate(policy, eval_env, config.num_eval_episodes, train_step=i)
+                output_tracking.append(csv_line)
                 for k, v in eval_stats.items():
                     logger.log_scalar(
                         v,
@@ -203,6 +216,7 @@ def main(_):
                         "evaluation",
                     )
                 logger.flush()
+                print(output_tracking)
 
             if (i + 1) % config.checkpoint_frequency == 0:
                 checkpoint_manager.save(i)
@@ -213,6 +227,7 @@ def main(_):
     finally:
         checkpoint_manager.save(i)  # pylint: disable=undefined-loop-variable
         logger.close()
+        np.savetxt(osp.join(exp_dir, "reward_tracking.csv"), np.array(output_tracking), delimiter=",")
 
 
 if __name__ == "__main__":

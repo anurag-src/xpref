@@ -25,7 +25,8 @@ import gym
 import imageio
 import numpy as np
 import torch
-from xirl.models import SelfSupervisedModel, PreferenceRewardPredictor
+from xirl import factory
+from xirl.models import SelfSupervisedModel, Resnet18LinearEncoderNet
 from torchkit import CheckpointManager
 
 import cv2
@@ -335,18 +336,23 @@ class InferredFromEmbeddingReward(LearnedVisualReward):
   def __init__(
       self,
       reward_network,
+      goal_examples_dataset,
+      embedding_size=32,
       **base_kwargs,
   ):
     """Constructor.
 
     Args:
       reward_network: A path to a pretrained reward network of type PreferenceRewardPredictor.
+      goal_examples_path: A path to a folder containing goal examples
+      embedding_size: The size of the embedding model
       **base_kwargs: Base keyword arguments.
     """
     super().__init__(**base_kwargs)
 
     device = "cpu"
-    self.reward_predictor = PreferenceRewardPredictor().to(device)
+    self.goal_examples = goal_examples_dataset
+    self.reward_predictor = Resnet18LinearEncoderNet(embedding_size).to(device)
     checkpoint_dir = os.path.join(reward_network, "checkpoints")
     checkpoint_manager = CheckpointManager(
       checkpoint_dir,
@@ -355,9 +361,41 @@ class InferredFromEmbeddingReward(LearnedVisualReward):
     checkpoint_manager.restore_or_initialize()
     self.reward_predictor.eval()
 
+    goal_dataloader = self.load_goal_frames(split_type="Train")
+    self.goal_embedding = self.calculate_goal_embedding(goal_dataloader, eval=True).numpy()
+
+
   def _get_reward_from_image(self, image):
     """Forward the pixels through the model and compute the reward."""
     image_tensor = self._to_tensor(image)
-    embs = self._model.infer(image_tensor).embs
-    reward = self.reward_predictor.forward(embs)
-    return reward.item()
+    embs = self.reward_predictor.infer(image_tensor).numpy().embs
+    dist_to_goal = -1.0 * np.linalg.norm(embs - self.goal_embedding)
+    return dist_to_goal
+
+  def load_goal_frames(self, split_type="Train", debug=False):
+    return torch.utils.data.DataLoader(
+      self.goal_examples,
+      # collate_fn=dataset.collate_fn,
+      batch_size=50,
+      num_workers=4 if torch.cuda.is_available() and not debug else 0,
+      pin_memory=torch.cuda.is_available() and not debug,
+    )
+
+  def calculate_goal_embedding(self, goal_dataloader, eval=False, device="cuda"):
+    if not eval:
+      self.reward_predictor.train()
+    else:
+      self.reward_predictor.eval()
+
+    sum = None
+    total_embeddings = 0
+    for batch in goal_dataloader:
+      frames = batch["frames"].to(device)
+      out = self.reward_predictor(frames).embs
+      total_embeddings += len(out)
+      if sum is None:
+        sum = torch.sum(out, dim=0)
+      else:
+        sum += torch.sum(out, dim=0)
+    # Average the sum of embeddings
+    return sum / total_embeddings

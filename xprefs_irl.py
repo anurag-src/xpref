@@ -12,6 +12,7 @@ from xirl import factory
 from torchkit import CheckpointManager
 from xirl.losses import compute_tcc_loss
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
 from ml_collections import config_dict
 
@@ -19,7 +20,7 @@ ConfigDict = config_dict.ConfigDict
 
 # XIRL_CONFIG_FILE = "base_configs/pretrain.py"
 CONFIG = get_config()
-X_MAGICAL_DATA_PATH = os.path.expanduser("~/Documents/Xpref/trajectories")
+X_MAGICAL_DATA_PATH = os.path.expanduser("~/Documents/Xpref/trajectories2")
 # X_MAGICAL_DATA_PATH = os.path.expanduser("~/Documents/Xpref/xmagical")
 CONFIG.data.root = X_MAGICAL_DATA_PATH
 
@@ -33,16 +34,19 @@ USE_AVERAGE_REWARD = True
 
 if LOAD_CHECKPOINT:
     CONFIG.optim.train_max_iters = 5000
+else:
+    CONFIG.optim.train_max_iters = 10
 
-TRAIN_EMBODIMENTS = tuple(["gripper", "shortstick", "mediumstick"])
+TRAIN_EMBODIMENTS = tuple(["gripper", "shortstick", "longstick"])
 CONFIG.data.pretrain_action_class = TRAIN_EMBODIMENTS
 CONFIG.data.down_stream_action_class = TRAIN_EMBODIMENTS
 
-PREFERENCES_FILE = os.path.expanduser("~/Documents/Xpref/trajectories/train/cross_embedding_prefs.csv")
-REMOVE_FROM_PREFERENCES = "longstick"
+PREFERENCES_FILE = os.path.expanduser("~/Documents/Xpref/trajectories2/train/cross_embedding_prefs.csv")
+REMOVE_FROM_PREFERENCES = "mediumstick"
 
 BATCH_SIZE = 15
-MAX_TRAINING_PREFS = 10000
+# MAX_TRAINING_PREFS = 10000
+MAX_TRAINING_PREFS = 100
 MAX_TESTING_PREFS = 200
 EVAL_EVERY = 50
 
@@ -59,12 +63,12 @@ def load_preferences(split_type="train"):
     return df
 
 def load_device():
-    device = (
-        "cuda"
-        if torch.cuda.is_available()
-        else "cpu"
-    )
-    # device = "cpu"
+    # device = (
+    #     "cuda"
+    #     if torch.cuda.is_available()
+    #     else "cpu"
+    # )
+    device = "cpu"
     return device
 
 def load_dataset(split_type="train", debug=False):
@@ -376,11 +380,10 @@ def train_xprefs():
     losses = []
     plt.ion()
 
-
     print(f"Begin Training Loop with {len(preferences)} preferences!")
     # Main Training Loop
-    RECOMPUTE_GOAL_AT = range(0, 5000, 200)
-    eval_goal = eval_goal_embedding(model, goal_examples_data)
+    RECOMPUTE_GOAL_AT = []
+    eval_goal = eval_goal_embedding(model, goal_examples_data, device=device)
     try:
         while not complete:
             for batch_i in range(0, len(preferences), BATCH_SIZE):
@@ -433,6 +436,8 @@ def train_xprefs():
         data_out = pd.DataFrame(save_out)
         data_out.columns = ["steps", "epochs", "train_loss", "test_loss", "test_acc"]
         data_out.to_csv(os.path.join(exp_dir, "embedding_train.csv"))
+        np.savetxt(os.path.join(exp_dir, "goal_embedding.csv"), eval_goal.numpy(), delimiter=",")
+
 
     print("Training terminated.")
 

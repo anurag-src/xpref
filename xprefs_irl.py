@@ -94,18 +94,21 @@ def train_xprefs():
                 if not global_step % XPREFS_CONFIG.irl.eval_every:
                     # eval_goal = eval_goal_embedding(model, goal_examples_data)
                     print("Running Validation Loop!")
-                    test_loss = trainer.validation_loop(eval_goal)
+                    test_loss, test_acc = trainer.validation_loop(eval_goal, train=False)
+                    train_loss_whole_set, train_acc = trainer.validation_loop(eval_goal, train=True)
                     print(
-                        "Iter[{}/{}] (Epoch {}), {:.6f}s/iter, Loss: {:.3f}, Test Loss: {:.3f}, Test Accuracy: {:3f}".format(
+                        "Iter[{}/{}] (Epoch {}), {:.6f}s/iter, Loss: {:.3f}, Test Loss: {:.3f}, Test Accuracy: {:3f}, Train Loss: {:.3f}, Train Accuracy: {:3f}".format(
                             global_step,
                             XPREFS_CONFIG.irl.train_max_iters,
                             epoch,
                             time.time() - iter_start_time,
                             train_loss.item(),
-                            test_loss[0],
-                            test_loss[1],
+                            test_loss,
+                            test_acc,
+                            train_loss_whole_set,
+                            train_acc
                         ))
-                    save_out.append([global_step, epoch, train_loss.item(), test_loss[0], test_loss[1]])
+                    save_out.append([global_step, epoch, train_loss.item(), test_loss, test_loss, train_loss_whole_set, train_acc])
 
                 global_step += 1
                 if global_step > XPREFS_CONFIG.irl.train_max_iters:
@@ -122,7 +125,7 @@ def train_xprefs():
     finally:
         trainer.save_checkpoint(global_step)
         data_out = pd.DataFrame(save_out)
-        data_out.columns = ["steps", "epochs", "train_loss", "test_loss", "test_acc"]
+        data_out.columns = ["steps", "epochs", "train_loss", "test_loss", "test_acc", "training_loss", "training_acc"]
         data_out.to_csv(os.path.join(exp_dir, "embedding_train.csv"))
         np.savetxt(os.path.join(exp_dir, "goal_embedding.csv"), eval_goal.cpu().numpy(), delimiter=",")
 

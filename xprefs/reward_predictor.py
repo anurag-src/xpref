@@ -89,13 +89,15 @@ class XPrefsRewardTrainer:
         elif self.model_type == "RLHF":
             raise NotImplementedError("Implement this function")
 
-    def validation_loop(self, eval_goal):
+    def validation_loop(self, eval_goal, train=False):
         criterion = torch.nn.CrossEntropyLoss()
         self.model.eval()
         cumulative_loss = 0.0
         total_correct, total_seen = 0, 0
-        for j in range(len(self.validation_preferences)):
-            o1, o2 = self.get_ith_from_preferences(self.validation_preferences, self.validation_dataset, j)
+        dataset = self.validation_dataset if not train else self.training_dataset
+        prefs = self.validation_preferences if not train else self.training_preferences
+        for j in range(len(prefs)):
+            o1, o2 = self.get_ith_from_preferences(prefs, dataset, j)
 
             sum_reward_o1 = self.r_from_traj(o1, eval_goal)
             sum_reward_o2 = self.r_from_traj(o2, eval_goal)

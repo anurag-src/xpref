@@ -64,7 +64,7 @@ class TrajectoryLoader:
 
         # Restrict action classes if they have been provided. Else, load all
         # from the data directory.
-        c_action_class = config.data.train_embodiments if train else config.data.valdiation_embodiments
+        c_action_class = config.data.train_embodiments if train else config.data.validation_embodiments
 
         # We need to separate out the dataclasses for each action class when
         # creating downstream datasets.

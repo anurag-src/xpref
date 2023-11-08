@@ -299,33 +299,9 @@ def goal_dataset_from_config(config, goal_data_root, limit_per_embodiment, downs
         image_size = (image_size, image_size)
     image_size = tuple(image_size)
 
-    # Note(kevin): We used to disable data augmentation on all downstream
-    # dataloaders. I've decided to keep them for train downstream loaders.
-    if debug:
-        # The minimum data augmentation we want to keep is resizing when
-        # debugging.
-        aug_names = ["global_resize"]
-    else:
-        if split == "train":
-            aug_names = config.data_augmentation.train_transforms
-        else:
-            aug_names = config.data_augmentation.eval_transforms
-
-    # Create a list of data augmentation callables.
-    aug_funcs = []
-    for name in aug_names:
-        if "resize" in name or "crop" in name:
-            aug_funcs.append(create_transform(name, *image_size))
-        else:
-            aug_funcs.append(create_transform(name))
-
-    augmentor = transforms.VideoAugmentor({SequenceType.FRAMES: aug_funcs})
-
     # Restrict action classes if they have been provided. Else, load all
     # from the data directory.
-    c_action_class = (
-        config.data.downstream_action_class
-        if downstream else config.data.pretrain_action_class)
+    c_action_class = config.data.validation_embodiments
 
     # We need to separate out the dataclasses for each action class when
     # creating downstream datasets.
@@ -334,5 +310,5 @@ def goal_dataset_from_config(config, goal_data_root, limit_per_embodiment, downs
         dataset_path,
         c_action_class,
         limit_per_type=limit_per_embodiment,
-        augmentor=augmentor
+        augmentor=None
     )

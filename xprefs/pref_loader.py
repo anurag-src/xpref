@@ -32,6 +32,10 @@ class PreferenceLoader:
         for removal in self.removed_embodiments:
             df = df.loc[df["o1_embod"] != removal]
             df = df.loc[df["o2_embod"] != removal]
+
+        # Truncate if necessary
+        limit = self.config.data.truncate_training_preferences if self.training_data else self.config.data.truncate_testing_preferences
+        df = df[:limit]
         return df
 
     def remove_embodiments(self):

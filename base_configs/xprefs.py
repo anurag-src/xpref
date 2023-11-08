@@ -26,7 +26,7 @@ def get_config():
     Specify Training Data
     """
     config.data = ml_collections.ConfigDict()
-    config.data.demonstrations_root = os.path.expanduser("~/Documents/Xpref/trajectories/")
+    config.data.demonstrations_root = os.path.expanduser("~/Documents/Xpref/trajectoriestoy/")
     config.data.preference_type = "cross_embodiment"  # Can be one of ["cross_embodiment", "same_embodiment"]
     config.data.truncate_training_preferences = 10000
     config.data.truncate_testing_preferences = 2000
@@ -46,7 +46,7 @@ def get_config():
     Define Information About Trajectory Sampling
     """
     config.sampler = ml_collections.ConfigDict()
-    config.sampler.stride = 1  # The stride with which to import video data
+    config.sampler.stride = 3  # The stride with which to import video data
 
     """
     Define Data Transformations
@@ -71,11 +71,13 @@ def get_config():
     """
     config.irl = ml_collections.ConfigDict()
     config.irl.learning_type = "Xprefs"  # Can be ["Xprefs", "RLHF"]
+    config.irl.recompute_goal_every = None
     config.irl.train_max_iters = 4000
     config.irl.eval_every = 250
     config.irl.batch_size = 20
     config.irl.embedding_size = 32
     config.irl.lr = 1e-3
     config.irl.average_learned_reward = True
+    config.irl.checkpointing_frequency = 5_000
 
     return config

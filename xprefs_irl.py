@@ -6,11 +6,12 @@ import os
 import time
 import torch
 import yaml
-from torchvision.datasets import ImageFolder
+from xprefs.pref_loader import PreferenceLoader
 from configs.xmagical.pretraining.tcc import get_config
+from base_configs.xprefs import get_config as get_xprefs_config
+from xprefs.trajectory_loader import TrajectoryLoader
 from xirl import factory
 from torchkit import CheckpointManager
-from xirl.losses import compute_tcc_loss
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -19,10 +20,8 @@ from ml_collections import config_dict
 ConfigDict = config_dict.ConfigDict
 
 # XIRL_CONFIG_FILE = "base_configs/pretrain.py"
-CONFIG = get_config()
-X_MAGICAL_DATA_PATH = os.path.expanduser("~/Documents/Xpref/trajectories")
-# X_MAGICAL_DATA_PATH = os.path.expanduser("~/Documents/Xpref/xmagical")
-CONFIG.data.root = X_MAGICAL_DATA_PATH
+XPREFS_CONFIG = get_xprefs_config()
+
 
 GOALSET_PATH = os.path.expanduser("~/Documents/Xpref/goal_examples")
 LIM_GOALS_PER_EMBODIMENT = 200
@@ -31,59 +30,13 @@ EXPERIMENT_DIRECTORY = os.path.expanduser("~/Documents/Xpref/experiments")
 LOAD_CHECKPOINT = None
 
 USE_AVERAGE_REWARD = True
-
-if LOAD_CHECKPOINT:
-    CONFIG.optim.train_max_iters = 5000
-
-TRAIN_EMBODIMENTS = tuple(["gripper", "shortstick", "longstick"])
-CONFIG.data.pretrain_action_class = TRAIN_EMBODIMENTS
-CONFIG.data.down_stream_action_class = TRAIN_EMBODIMENTS
-
 PREFERENCES_FILE = os.path.expanduser("~/Documents/Xpref/trajectories2/train/cross_embedding_prefs.csv")
 REMOVE_FROM_PREFERENCES = "mediumstick"
 
 BATCH_SIZE = 20
-MAX_TRAINING_PREFS = 10000
-# MAX_TRAINING_PREFS = 100
-MAX_TESTING_PREFS = 100
 EVAL_EVERY = 250
 
-def load_preferences(split_type="train"):
-    df = pd.read_csv(PREFERENCES_FILE)
-    # df.columns = ["o1_id", "o1_embod", "o1_reward", "o2_id", "o2_embod", "o2_reward"]
-    # Remove the withheld embodiment from preference data
-    df = df.loc[df["o1_embod"] != REMOVE_FROM_PREFERENCES]
-    df = df.loc[df["o2_embod"] != REMOVE_FROM_PREFERENCES]
-    if split_type == "train":
-        df = df.head(MAX_TRAINING_PREFS)
-    elif split_type == "valid":
-        df = df.tail(MAX_TESTING_PREFS)
-    return df
 
-def load_device():
-    device = (
-        "cuda"
-        if torch.cuda.is_available()
-        else "cpu"
-    )
-    # device = "cpu"
-    return device
-
-def load_dataset(split_type="train", debug=False):
-    dataset = factory.dataset_from_config(CONFIG, False, split_type, debug)
-    batch_sampler = factory.video_sampler_from_config(
-        CONFIG, dataset.dir_tree, downstream=False, sequential=debug)
-    return torch.utils.data.DataLoader(
-        dataset,
-        collate_fn=dataset.collate_fn,
-        batch_sampler=batch_sampler,
-        num_workers=4 if torch.cuda.is_available() and not debug else 0,
-        pin_memory=torch.cuda.is_available() and not debug,
-    )
-
-def load_preference_dataset(split_type="train", debug=False):
-    dataset = factory.full_dataset_from_config(CONFIG, False, split_type, debug)
-    return dataset
 
 def get_ith_from_preferences(preferences, dataset, i):
     data_row = preferences.iloc[i]
@@ -100,42 +53,6 @@ def load_goal_frames(split_type="Train", debug=False):
         pin_memory=torch.cuda.is_available() and not debug,
     )
 
-def load_model():
-    return factory.model_from_config(CONFIG)
-
-def load_tcc_optimizer(model):
-    return torch.optim.Adam(model.parameters(), lr=1e-3)
-    # return factory.optim_from_config(config=CONFIG, model=model)
-
-def load_trainer(model, optimizer, device):
-    return factory.trainer_from_config(CONFIG, model, optimizer, device)
-
-def tcc_loss(embs, batch):
-    steps = batch["frame_idxs"].to(load_device())
-    seq_lens = batch["video_len"].to(load_device())
-
-    # Dynamically determine the number of cycles if using stochastic
-    # matching.
-    batch_size, num_cc_frames = embs.shape[:2]
-    num_cycles = int(batch_size * num_cc_frames)
-
-    config = CONFIG
-    return compute_tcc_loss(
-        embs=embs,
-        idxs=steps,
-        seq_lens=seq_lens,
-        stochastic_matching=config.loss.tcc.stochastic_matching,
-        normalize_embeddings=config.model.normalize_embeddings,
-        loss_type=config.loss.tcc.loss_type,
-        similarity_type=config.loss.tcc.similarity_type,
-        num_cycles=num_cycles,
-        cycle_length=config.loss.tcc.cycle_length,
-        temperature=config.loss.tcc.softmax_temperature,
-        label_smoothing=config.loss.tcc.label_smoothing,
-        variance_lambda=config.loss.tcc.variance_lambda,
-        huber_delta=config.loss.tcc.huber_delta,
-        normalize_indices=config.loss.tcc.normalize_indices,
-    )
 
 def create_experiment_dir(name=None):
     if not os.path.exists(EXPERIMENT_DIRECTORY):
@@ -170,18 +87,6 @@ def calculate_goal_embedding(model, goal_dataloader, eval=False, device="cuda"):
             sum += torch.sum(out, dim=0)
     # Average the sum of embeddings
     return sum / total_embeddings
-
-def train_one_iteration(model, optimizer, criterion, batch, device="cuda"):
-    model.train()
-    optimizer.zero_grad()
-
-    frames = batch["frames"].to(device)
-    out = model(frames)
-
-    loss = criterion(out.embs, batch)
-    loss.backward()
-    optimizer.step()
-    return loss
 
 def cumulative_r_from_traj(observation, model, goal_embedding, device, eval=False, average=False):
     if eval:
@@ -276,73 +181,6 @@ def eval_one_iteration(model, criterion, validation_set, num_iters=None, device=
             it_ += 1
         return total_loss / it_
 
-def train_tcc():
-    device = load_device()
-    print(f"Using {device} device")
-
-    model = load_model().to(device)
-    optimizer = load_tcc_optimizer(model)
-    trainer = load_trainer(model, optimizer, device)
-    exp_dir = create_experiment_dir()
-
-    checkpoint_dir = os.path.join(exp_dir, "checkpoints")
-    checkpoint_manager = CheckpointManager(
-        checkpoint_dir,
-        model=model,
-        optimizer=optimizer,
-    )
-
-    batch_loaders = {
-        "train": load_dataset("train", debug=False),
-        "valid": load_dataset("valid", debug=False)
-    }
-    goal_examples_data = load_goal_frames("train", debug=False)
-
-    global_step = checkpoint_manager.restore_or_initialize()
-    total_batches = max(1, len(batch_loaders["train"]))
-    epoch = int(global_step / total_batches)
-    complete = False
-
-    criterion = tcc_loss
-    iter_start_time = time.time()
-
-    # Main Training Loop
-    try:
-        while not complete:
-            for batch in batch_loaders["train"]:
-                train_loss = train_one_iteration(model, optimizer, criterion, batch, device)
-                eval_goal = eval_goal_embedding(model, goal_examples_data, device=device)
-
-                if not global_step % CONFIG.checkpointing_frequency:
-                    checkpoint_manager.save(global_step)
-
-                if not global_step % CONFIG.eval.eval_frequency:
-                    test_loss = eval_one_iteration(model, criterion=criterion, validation_set=batch_loaders["valid"], num_iters=10, device=device)
-                    print("Iter[{}/{}] (Epoch {}), {:.6f}s/iter, Loss: {:.3f}, Test {:.3f}".format(
-                        global_step,
-                        CONFIG.optim.train_max_iters,
-                        epoch,
-                        time.time() - iter_start_time,
-                        train_loss.item(),
-                        test_loss.item()
-                    ))
-
-                global_step += 1
-                if global_step > CONFIG.optim.train_max_iters:
-                    complete = True
-                    break
-
-                iter_start_time = time.time()
-            epoch += 1
-
-    except KeyboardInterrupt:
-        print("Caught keyboard interrupt. Saving model before quitting.")
-
-    finally:
-        checkpoint_manager.save(global_step)
-
-    print("Training terminated.")
-
 def train_xprefs():
     device = load_device()
     print(f"Using {device} device")
@@ -361,9 +199,11 @@ def train_xprefs():
         optimizer=optimizer,
     )
 
-    preferences = load_preferences()
-    full_traj_dataset = load_preference_dataset("train", debug=False)
-    valid_preferences_dataset = load_preferences("valid")
+    # Load the preference data from the config using a Dataloader, returns pandas Dataframe
+    training_preferences = PreferenceLoader(XPREFS_CONFIG, train=True).preferences
+    validation_preferences = PreferenceLoader(XPREFS_CONFIG, train=False).preferences
+    training_trajectories = TrajectoryLoader.full_dataset_from_config(XPREFS_CONFIG, train=True)
+    validation_trajectories = TrajectoryLoader.full_dataset_from_config(XPREFS_CONFIG, train=False)
 
     goal_examples_data = load_goal_frames("train", debug=False)
 
@@ -372,38 +212,27 @@ def train_xprefs():
     epoch = 0
     complete = False
 
-    criterion = tcc_loss
     iter_start_time = time.time()
-
     save_out = []
-
     losses = []
     plt.ion()
 
-    print(f"Begin Training Loop with {len(preferences)} preferences!")
+    print(f"Begin Training Loop with {len(training_preferences)} preferences!")
     # Main Training Loop
     RECOMPUTE_GOAL_AT = []
     eval_goal = eval_goal_embedding(model, goal_examples_data, device=device)
     try:
         while not complete:
-            for batch_i in range(0, len(preferences), BATCH_SIZE):
-                train_loss = train_xprefs_pair(model, optimizer, batch_i, preferences, full_traj_dataset, eval_goal, device, average=USE_AVERAGE_REWARD)
+            for batch_i in range(0, len(training_preferences), BATCH_SIZE):
+                train_loss = train_xprefs_pair(model, optimizer, batch_i, training_preferences, training_trajectories, eval_goal, device, average=USE_AVERAGE_REWARD)
                 print(f"Training Loss for step {global_step}: {train_loss.item()}")
-                # losses.append(train_loss.item())
-
-                # plt.plot(losses)
-                # plt.pause(0.01)
-                # plt.title("XPrefs Training Loss")
-                # plt.ylabel("Loss")
-                # plt.xlabel("Batch Updates")
-                # plt.show()
 
                 if not global_step % CONFIG.checkpointing_frequency:
                     checkpoint_manager.save(global_step)
 
                 if not global_step % EVAL_EVERY:
                     # eval_goal = eval_goal_embedding(model, goal_examples_data)
-                    test_loss = validation_xprefs(model, valid_preferences_dataset, full_traj_dataset, eval_goal, device=device, average=USE_AVERAGE_REWARD)
+                    test_loss = validation_xprefs(model, validation_preferences, validation_trajectories, eval_goal, device=device, average=USE_AVERAGE_REWARD)
                     print("Iter[{}/{}] (Epoch {}), {:.6f}s/iter, Loss: {:.3f}, Test Loss: {:.3f}, Test Accuracy: {:3f}".format(
                         global_step,
                         CONFIG.optim.train_max_iters,

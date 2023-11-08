@@ -2,7 +2,7 @@ import numpy as np
 import csv
 import pandas as pd
 
-FILE = "/home/connor/Documents/Xpref/trajectories/train/old_prefs/cross_embedding_prefs.csv"
+FILE = "/home/connor/Documents/Xpref/trajectories/valid/same_embedding_prefs.csv"
 MAX_PREFERENCES = 100_000
 
 if __name__ == "__main__":

@@ -3,6 +3,7 @@ import torch
 import os
 from configs.xmagical.pretraining.tcc import get_config
 from xirl import factory
+import numpy as np
 from torchkit import CheckpointManager
 
 CHECKPOINTS = {
@@ -10,13 +11,13 @@ CHECKPOINTS = {
     # "TCC Only (MQME 0.5)": "/home/connor/Documents/Xpref/experiments/09-26-23-TCCMQME",
     # "TCC + XPrefs (MQME 0.5)": "/home/connor/Documents/Xpref/experiments/09-26-23-TCCandXPrefs",
     # "Xprefs Only (Dynamic Goal $\phi$)" : "/home/connor/Documents/Xpref/experiments/09-26-23-XPrefsOnlyDynamicGoal",
-    "Xprefs Only (Static Goal $\phi$)" : "/home/connor/Documents/Xpref/experiments/10-02-23-Full-Data-Xprefs"
+    "Xprefs Only (Static Goal $\phi$)" : "/home/connor/Documents/Xpref/experiments/11-08-23-Traj1-TestA"
 }
 
-EMBODIMENT_TARGETS = ["shortstick", "longstick", "gripper"]
-GOOD_TRAJECTORY_INDEX = 18
-BAD_TRAJECTORY_INDEX = 22
-OTHER_TRAJECTORY_INDEX = 964
+EMBODIMENT_TARGETS = ["longstick", "longstick", "longstick"]
+GOOD_TRAJECTORY_INDEX = 4
+BAD_TRAJECTORY_INDEX = 395
+OTHER_TRAJECTORY_INDEX = 1959
 GOALSET_PATH = os.path.expanduser("~/Documents/Xpref/goal_examples")
 LIM_GOALS_PER_EMBODIMENT = 10
 
@@ -54,28 +55,10 @@ def load_goal_frames(split_type="Train", debug=False):
         pin_memory=torch.cuda.is_available() and not debug,
     )
 
-def eval_goal_embedding(model, goals, device="cuda"):
-    with torch.no_grad():
-        return calculate_goal_embedding(model, goals, eval=True, device=device)
-
-def calculate_goal_embedding(model, goal_dataloader, eval=False, device="cuda"):
-    if not eval:
-        model.train()
-    else:
-        model.eval()
-
-    sum = None
-    total_embeddings = 0
-    for batch in goal_dataloader:
-        frames = batch["frames"].to(device)
-        out = model(frames).embs
-        total_embeddings += len(out)
-        if sum is None:
-            sum = torch.sum(out, dim=0)
-        else:
-            sum += torch.sum(out, dim=0)
-    # Average the sum of embeddings
-    return sum / total_embeddings
+def calculate_goal_embedding(exp_dir, device="cuda"):
+    goal_file = os.path.join(exp_dir, "goal_embedding.csv")
+    goal = np.loadtxt(goal_file, delimiter=',')
+    return torch.tensor(goal).to(device)
 
 def load_model(checkpoint_dir):
     m = factory.model_from_config(CONFIG)
@@ -114,7 +97,7 @@ if __name__ == "__main__":
     i = 0
     for cp in CHECKPOINTS:
         m = load_model(CHECKPOINTS[cp]).to(device)
-        goal_embedding = eval_goal_embedding(m, goal_data, device=device)
+        goal_embedding = calculate_goal_embedding(CHECKPOINTS[cp], device=device)
         rewards_1 = r_from_traj(observation_1, m, goal_embedding, device=device)
         rewards_2 = r_from_traj(observation_2, m, goal_embedding, device=device)
         rewards_3 = r_from_traj(observation_3, m, goal_embedding, device=device)

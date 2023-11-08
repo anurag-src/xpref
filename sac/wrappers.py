@@ -62,10 +62,10 @@ class FrameStack(gym.Wrapper):
 
     shp = env.observation_space.shape
     self.observation_space = gym.spaces.Box(
-        low=env.observation_space.low.min(),
-        high=env.observation_space.high.max(),
-        shape=((shp[0] * k,) + shp[1:]),
-        dtype=env.observation_space.dtype,
+      low=env.observation_space.low.min(),
+      high=env.observation_space.high.max(),
+      shape=((shp[0] * k,) + shp[1:]),
+      dtype=env.observation_space.dtype,
     )
 
   def reset(self):
@@ -182,11 +182,11 @@ class VideoRecorder(gym.Wrapper):
   """
 
   def __init__(
-      self,
-      env,
-      save_dir,
-      resolution = (128, 128),
-      fps = 30,
+          self,
+          env,
+          save_dir,
+          resolution = (128, 128),
+          fps = 30,
   ):
     super().__init__(env)
 
@@ -203,9 +203,9 @@ class VideoRecorder(gym.Wrapper):
     frame = self.env.render(mode="rgb_array")
     if frame.shape[:2] != (self.height, self.width):
       frame = cv2.resize(
-          frame,
-          dsize=(self.width, self.height),
-          interpolation=cv2.INTER_CUBIC,
+        frame,
+        dsize=(self.width, self.height),
+        interpolation=cv2.INTER_CUBIC,
       )
     self.frames.append(frame)
     observation, reward, done, info = self.env.step(action)
@@ -236,11 +236,11 @@ class LearnedVisualReward(abc.ABC, gym.Wrapper):
   """
 
   def __init__(
-      self,
-      env,
-      model,
-      device,
-      res_hw = None,
+          self,
+          env,
+          model,
+          device,
+          res_hw = None,
   ):
     """Constructor.
 
@@ -292,10 +292,10 @@ class DistanceToGoalLearnedVisualReward(LearnedVisualReward):
   """Replace the environment reward with distances in embedding space."""
 
   def __init__(
-      self,
-      goal_emb,
-      distance_scale = 1.0,
-      **base_kwargs,
+          self,
+          goal_emb,
+          distance_scale = 1.0,
+          **base_kwargs,
   ):
     """Constructor.
 
@@ -335,9 +335,7 @@ on the embedding
 class InferredFromEmbeddingReward(LearnedVisualReward):
   def __init__(
       self,
-      reward_network,
-      goal_examples_dataset,
-      embedding_size=32,
+      expiriment_dir,
       **base_kwargs,
   ):
     """Constructor.
@@ -350,20 +348,27 @@ class InferredFromEmbeddingReward(LearnedVisualReward):
     """
     super().__init__(**base_kwargs)
 
-    device = "cpu"
-    self.goal_examples = goal_examples_dataset
-    self.reward_predictor = Resnet18LinearEncoderNet(embedding_size).to(device)
-    checkpoint_dir = os.path.join(reward_network, "checkpoints")
-    checkpoint_manager = CheckpointManager(
-      checkpoint_dir,
-      model=self.reward_predictor,
-    )
-    checkpoint_manager.restore_or_initialize()
+    device = "cuda"
+
+    self.goal_embedding = self.calculate_goal_embedding(expiriment_dir)
+    self.reward_predictor = Resnet18LinearEncoderNet(
+        len(self.goal_embedding),
+        num_ctx_frames=1,
+        normalize_embeddings=False,
+        learnable_temp=False,
+    ).to(device)
     self.reward_predictor.eval()
 
-    goal_dataloader = self.load_goal_frames(split_type="Train")
-    self.goal_embedding = self.calculate_goal_embedding(goal_dataloader, eval=True).numpy()
+    checkpoint_dir = os.path.join(expiriment_dir, "checkpoints")
+    checkpoint_manager = CheckpointManager(
+        checkpoint_dir,
+        model=self.reward_predictor,
+    )
+    i = checkpoint_manager.restore_or_initialize()
 
+    if i == 0:
+        raise Exception(
+            f"Expected folder {expiriment_dir} to contain a valid checkpoint for model, but checkpoint file could not be loaded")
 
   def _get_reward_from_image(self, image):
     """Forward the pixels through the model and compute the reward."""
@@ -372,30 +377,7 @@ class InferredFromEmbeddingReward(LearnedVisualReward):
     dist_to_goal = -1.0 * np.linalg.norm(embs - self.goal_embedding)
     return dist_to_goal
 
-  def load_goal_frames(self, split_type="Train", debug=False):
-    return torch.utils.data.DataLoader(
-      self.goal_examples,
-      # collate_fn=dataset.collate_fn,
-      batch_size=50,
-      num_workers=4 if torch.cuda.is_available() and not debug else 0,
-      pin_memory=torch.cuda.is_available() and not debug,
-    )
-
-  def calculate_goal_embedding(self, goal_dataloader, eval=False, device="cuda"):
-    if not eval:
-      self.reward_predictor.train()
-    else:
-      self.reward_predictor.eval()
-
-    sum = None
-    total_embeddings = 0
-    for batch in goal_dataloader:
-      frames = batch["frames"].to(device)
-      out = self.reward_predictor(frames).embs
-      total_embeddings += len(out)
-      if sum is None:
-        sum = torch.sum(out, dim=0)
-      else:
-        sum += torch.sum(out, dim=0)
-    # Average the sum of embeddings
-    return sum / total_embeddings
+  def calculate_goal_embedding(self, exp_dir, device="cuda"):
+    goal_file = os.path.join(exp_dir, "goal_embedding.csv")
+    goal = np.loadtxt(goal_file, delimiter=',')
+    return torch.tensor(goal).cpu().numpy()

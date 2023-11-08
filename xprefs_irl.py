@@ -20,12 +20,12 @@ ConfigDict = config_dict.ConfigDict
 
 # XIRL_CONFIG_FILE = "base_configs/pretrain.py"
 CONFIG = get_config()
-X_MAGICAL_DATA_PATH = os.path.expanduser("~/Documents/Xpref/trajectories2")
+X_MAGICAL_DATA_PATH = os.path.expanduser("~/Documents/Xpref/trajectories")
 # X_MAGICAL_DATA_PATH = os.path.expanduser("~/Documents/Xpref/xmagical")
 CONFIG.data.root = X_MAGICAL_DATA_PATH
 
 GOALSET_PATH = os.path.expanduser("~/Documents/Xpref/goal_examples")
-LIM_GOALS_PER_EMBODIMENT = 10
+LIM_GOALS_PER_EMBODIMENT = 200
 EXPERIMENT_DIRECTORY = os.path.expanduser("~/Documents/Xpref/experiments")
 # LOAD_CHECKPOINT = "/home/connor/Documents/Xpref/experiments/09-26-23-TCCMQME"
 LOAD_CHECKPOINT = None
@@ -34,8 +34,6 @@ USE_AVERAGE_REWARD = True
 
 if LOAD_CHECKPOINT:
     CONFIG.optim.train_max_iters = 5000
-else:
-    CONFIG.optim.train_max_iters = 10
 
 TRAIN_EMBODIMENTS = tuple(["gripper", "shortstick", "longstick"])
 CONFIG.data.pretrain_action_class = TRAIN_EMBODIMENTS
@@ -44,11 +42,11 @@ CONFIG.data.down_stream_action_class = TRAIN_EMBODIMENTS
 PREFERENCES_FILE = os.path.expanduser("~/Documents/Xpref/trajectories2/train/cross_embedding_prefs.csv")
 REMOVE_FROM_PREFERENCES = "mediumstick"
 
-BATCH_SIZE = 15
-# MAX_TRAINING_PREFS = 10000
-MAX_TRAINING_PREFS = 100
-MAX_TESTING_PREFS = 200
-EVAL_EVERY = 50
+BATCH_SIZE = 20
+MAX_TRAINING_PREFS = 10000
+# MAX_TRAINING_PREFS = 100
+MAX_TESTING_PREFS = 100
+EVAL_EVERY = 250
 
 def load_preferences(split_type="train"):
     df = pd.read_csv(PREFERENCES_FILE)
@@ -63,12 +61,12 @@ def load_preferences(split_type="train"):
     return df
 
 def load_device():
-    # device = (
-    #     "cuda"
-    #     if torch.cuda.is_available()
-    #     else "cpu"
-    # )
-    device = "cpu"
+    device = (
+        "cuda"
+        if torch.cuda.is_available()
+        else "cpu"
+    )
+    # device = "cpu"
     return device
 
 def load_dataset(split_type="train", debug=False):
@@ -195,7 +193,7 @@ def cumulative_r_from_traj(observation, model, goal_embedding, device, eval=Fals
             g_e = g_e.repeat(len(embed_o), 1)
             goal_diff = g_e - embed_o
             dist_to_reward_o = torch.norm(goal_diff, dim=1)
-            sum_reward_o = torch.sum(dist_to_reward_o)
+            sum_reward_o = -torch.sum(dist_to_reward_o)
             if average:
                 return sum_reward_o / len(embed_o)
             return sum_reward_o
@@ -206,7 +204,9 @@ def cumulative_r_from_traj(observation, model, goal_embedding, device, eval=Fals
     g_e = g_e.repeat(len(embed_o), 1)
     goal_diff = g_e - embed_o
     dist_to_reward_o = torch.norm(goal_diff, dim=1)
-    sum_reward_o = torch.sum(dist_to_reward_o)
+
+    # Reward is the negative distance to goal
+    sum_reward_o = -torch.sum(dist_to_reward_o)
     if average:
         return sum_reward_o / len(embed_o)
     return sum_reward_o
@@ -256,7 +256,7 @@ def validation_xprefs(model, validation_prefs, dataset, eval_goal, device="cuda"
         loss = criterion(torch.stack(reward_out_pair), torch.tensor(0).to(device))
         cumulative_loss += loss.item()
 
-        if sum_reward_o1 > sum_reward_o2:
+        if sum_reward_o1.item() > sum_reward_o2.item():
             total_correct += 1
         total_seen += 1
 
@@ -436,7 +436,7 @@ def train_xprefs():
         data_out = pd.DataFrame(save_out)
         data_out.columns = ["steps", "epochs", "train_loss", "test_loss", "test_acc"]
         data_out.to_csv(os.path.join(exp_dir, "embedding_train.csv"))
-        np.savetxt(os.path.join(exp_dir, "goal_embedding.csv"), eval_goal.numpy(), delimiter=",")
+        np.savetxt(os.path.join(exp_dir, "goal_embedding.csv"), eval_goal.cpu().numpy(), delimiter=",")
 
 
     print("Training terminated.")

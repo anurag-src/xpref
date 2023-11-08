@@ -53,7 +53,7 @@ def get_config():
 
   config.reward_wrapper = ml_collections.ConfigDict()
   # config.reward_wrapper.pretrained_path = "/home/connor/Documents/xprefs/pretrain_runs/dataset=xmagical_mode=cross_algo=xirl_embodiment=mediumstick/"
-  config.reward_wrapper.pretrained_path = "/home/connor/Documents/Xpref/experiments/10-02-23-Full-Data-Xprefs"
+  config.reward_wrapper.pretrained_path = "/home/connor/Documents/Xpref/experiments/11-06-23-Traj2-Mediumstick"
 
   # Can be one of ['distance_to_goal', 'goal_classifier', 'reward_prediction_from_prefs'].
   config.reward_wrapper.type = "reward_prediction_from_prefs"
@@ -65,7 +65,7 @@ def get_config():
   config.replay_buffer_capacity = 1_000_000
   config.num_seed_steps = 5_000
   config.num_eval_episodes = 50
-  config.eval_frequency = 1_000
+  config.eval_frequency = 5_000
   config.checkpoint_frequency = 50_000
   config.log_frequency = 10_000
   config.save_video = True

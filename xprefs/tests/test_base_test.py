@@ -166,6 +166,7 @@ class TestTrajectoryLoading(unittest.TestCase):
         from xprefs.trajectory_loader import TrajectoryLoader
         from base_configs.xprefs import get_config
         config = get_config()
+        config.sampler.stride = 1
         config.data.train_embodiments = ["longstick", "shortstick", "gripper", "mediumstick"]
         traj = TrajectoryLoader.full_dataset_from_config(config, train=True)
 

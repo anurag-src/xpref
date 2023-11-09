@@ -1,32 +1,32 @@
 import matplotlib.pyplot as plt
 import torch
 import os
-from configs.xmagical.pretraining.tcc import get_config
+from base_configs.xprefs import get_config as get_xprefs_config
+from xprefs.trajectory_loader import TrajectoryLoader
 from xirl import factory
 import numpy as np
 from torchkit import CheckpointManager
+from xprefs.reward_predictor import XPrefsRewardTrainer
 
 CHECKPOINTS = {
     # "TCC Only (XMagical)": "/home/connor/Documents/Xpref/experiments/09-26-23-TCCXMagical",
     # "TCC Only (MQME 0.5)": "/home/connor/Documents/Xpref/experiments/09-26-23-TCCMQME",
     # "TCC + XPrefs (MQME 0.5)": "/home/connor/Documents/Xpref/experiments/09-26-23-TCCandXPrefs",
     # "Xprefs Only (Dynamic Goal $\phi$)" : "/home/connor/Documents/Xpref/experiments/09-26-23-XPrefsOnlyDynamicGoal",
-    "Xprefs Only (Static Goal $\phi$)" : "/home/connor/Documents/Xpref/experiments/11-08-23-Traj1-TestA"
+    "Xprefs Only (Static Goal $\phi$)" : "/home/connor/Documents/Xpref/experiments/11-08-23-toy-test-A"
 }
 
-EMBODIMENT_TARGETS = ["longstick", "longstick", "longstick"]
-GOOD_TRAJECTORY_INDEX = 4
-BAD_TRAJECTORY_INDEX = 395
-OTHER_TRAJECTORY_INDEX = 1959
-GOALSET_PATH = os.path.expanduser("~/Documents/Xpref/goal_examples")
-LIM_GOALS_PER_EMBODIMENT = 10
+EMBODIMENT_TARGETS = ["shortstick", "shortstick", "shortstick"]
+GOOD_TRAJECTORY_INDEX = 107
+BAD_TRAJECTORY_INDEX = 0
+OTHER_TRAJECTORY_INDEX = 1683
 
-CONFIG = get_config()
+CONFIG = get_xprefs_config()
 EVAL_EMBODIMENTS = tuple(["gripper", "shortstick", "mediumstick", "longstick"])
 CONFIG.data.pretrain_action_class = EVAL_EMBODIMENTS
 CONFIG.data.down_stream_action_class = EVAL_EMBODIMENTS
 
-X_MAGICAL_DATA_PATH = os.path.expanduser("~/Documents/Xpref/trajectories")
+X_MAGICAL_DATA_PATH = os.path.expanduser("~/Documents/Xpref/trajectoriestoy")
 CONFIG.data.root = X_MAGICAL_DATA_PATH
 
 def load_device():
@@ -38,22 +38,9 @@ def load_device():
     # device = "cpu"
     return device
 
-def load_preference_dataset(split_type="train", debug=False):
-    dataset = factory.full_dataset_from_config(CONFIG, False, split_type, debug)
+def load_preference_dataset():
+    dataset = TrajectoryLoader.full_dataset_from_config(CONFIG, True)
     return dataset
-
-def load_goal_frames(split_type="Train", debug=False):
-    """
-    n: The number of frames to inject into the dataset, if None, use all frames
-    """
-    dataset = factory.goal_dataset_from_config(CONFIG, GOALSET_PATH, LIM_GOALS_PER_EMBODIMENT, False, split_type, debug)
-    return torch.utils.data.DataLoader(
-        dataset,
-        # collate_fn=dataset.collate_fn,
-        batch_size=50,
-        num_workers=4 if torch.cuda.is_available() and not debug else 0,
-        pin_memory=torch.cuda.is_available() and not debug,
-    )
 
 def calculate_goal_embedding(exp_dir, device="cuda"):
     goal_file = os.path.join(exp_dir, "goal_embedding.csv")
@@ -61,14 +48,7 @@ def calculate_goal_embedding(exp_dir, device="cuda"):
     return torch.tensor(goal).to(device)
 
 def load_model(checkpoint_dir):
-    m = factory.model_from_config(CONFIG)
-    checkpoint_dir = os.path.join(checkpoint_dir, "checkpoints")
-    checkpoint_manager = CheckpointManager(
-        checkpoint_dir,
-        model=m,
-        # optimizer=optimizer,
-    )
-    checkpoint_manager.restore_or_initialize()
+    m = XPrefsRewardTrainer(CONFIG, checkpoint_dir).model
     m.eval()
     return m
 
@@ -85,8 +65,7 @@ def r_from_traj(observation, model, goal_embedding, device):
 
 
 if __name__ == "__main__":
-    traj_data = load_preference_dataset("valid", debug=False)
-    goal_data = load_goal_frames("train")
+    traj_data = load_preference_dataset()
     device = load_device()
     print(len(traj_data))
     observation_1 = traj_data.get_item(EMBODIMENT_TARGETS[0], GOOD_TRAJECTORY_INDEX, eval=False)

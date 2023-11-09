@@ -50,7 +50,7 @@ class XPrefsRewardTrainer:
             reward_output_pairs.append(torch.stack([sum_reward_o1, sum_reward_o2]))
 
         # Cross entropy loss over summed rewards
-        loss = self.criterion(torch.stack(reward_output_pairs), torch.tensor([0 for _ in reward_output_pairs]).to(self.device))
+        loss = self.criterion(torch.stack(reward_output_pairs), torch.tensor([1 for _ in reward_output_pairs]).to(self.device))
         loss.backward()
         self.optimizer.step()
         return loss

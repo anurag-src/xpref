@@ -103,7 +103,7 @@ class XPrefsRewardTrainer:
             sum_reward_o2 = self.r_from_traj(o2, eval_goal, train=False)
             reward_out_pair = [sum_reward_o1, sum_reward_o2]
 
-            loss = criterion(torch.stack(reward_out_pair), torch.tensor(0).to(self.device))
+            loss = criterion(torch.stack(reward_out_pair), torch.tensor(1).to(self.device))
             cumulative_loss += loss.item()
 
             if sum_reward_o1.item() < sum_reward_o2.item():

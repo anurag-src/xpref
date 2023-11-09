@@ -63,7 +63,6 @@ def r_from_traj(observation, model, goal_embedding, device):
         dist_to_reward_o = torch.norm(goal_diff, dim=1)
         return -dist_to_reward_o
 
-
 if __name__ == "__main__":
     traj_data = load_preference_dataset()
     device = load_device()

@@ -27,13 +27,15 @@ def get_config():
     """
     config.data = ml_collections.ConfigDict()
     config.data.demonstrations_root = os.path.expanduser("~/Documents/Xpref/trajectoriestoy/")
-    config.data.preference_type = "cross_embodiment"  # Can be one of ["cross_embodiment", "same_embodiment"]
+    config.data.preference_type = "combined"  # Can be one of ["cross_embodiment", "same_embodiment", "combined"]
     config.data.truncate_training_preferences = 10000
     config.data.truncate_testing_preferences = 2000
     config.data.goal_examples = os.path.expanduser("~/Documents/Xpref/goal_examples")
     config.data.truncate_goals = 200
-    config.data.train_embodiments = ["longstick", "shortstick", "gripper"]
-    config.data.validation_embodiments = ["longstick", "shortstick", "gripper"]
+    config.data.train_embodiments = ["mediumstick"]
+    config.data.validation_embodiments = ["mediumstick"]
+    # config.data.train_embodiments = ["longstick", "shortstick", "gripper"]
+    # config.data.validation_embodiments = ["longstick", "shortstick", "gripper"]
     config.data.downstream_embodiments = ["mediumstick"]
 
     """

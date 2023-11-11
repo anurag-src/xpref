@@ -53,6 +53,29 @@ class TestPreferencesLoading(unittest.TestCase):
         self.assertTrue(len(prefs_training.preferences) != 0)
         self.assertTrue(len(prefs_testing.preferences) != 0)
 
+    def test_prefs_same_embodiment_inclusion_exclusion(self):
+        """
+        Confirm that the trajectory loader can specifically include/exclude same or cross embodiment preferences
+        """
+        from xprefs.pref_loader import PreferenceLoader
+        from base_configs.xprefs import get_config
+        config = get_config()
+        config.data.train_embodiments = ["longstick", "shortstick", "gripper"]
+        config.data.validation_embodiments = ["longstick", "shortstick", "gripper"]
+        config.data.preference_type = "combined"
+        prefs_combined = PreferenceLoader(config, train=True)
+
+        config.data.preference_type = "cross_embodiment"
+        prefs_cross = PreferenceLoader(config, train=True)
+
+        config.data.preference_type = "same_embodiment"
+        prefs_same = PreferenceLoader(config, train=True)
+
+        self.assertTrue(len(prefs_combined.preferences) != 0)
+        self.assertTrue(len(prefs_cross.preferences) != 0)
+        self.assertTrue(len(prefs_same.preferences) != 0)
+        self.assertTrue(len(prefs_combined.preferences) == len(prefs_same.preferences) + len(prefs_cross.preferences))
+
     def test_removing_embodiments_no_removal(self):
         """
         Should the config indicate that we only want to train on all embodiments, ensure no removal

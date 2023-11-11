@@ -22,11 +22,18 @@ class PreferenceLoader:
 
         if self.config.data.preference_type == "cross_embodiment":
             file_name = "cross_embedding_prefs.csv"
-        else:
+            preferences_file = os.path.join(directory, file_name)
+            df = pd.read_csv(preferences_file)
+        elif self.config.data.preference_type == "same_embodiment":
             file_name = "same_embedding_prefs.csv"
-
-        preferences_file = os.path.join(directory, file_name)
-        df = pd.read_csv(preferences_file)
+            preferences_file = os.path.join(directory, file_name)
+            df = pd.read_csv(preferences_file)
+        else:
+            preferences_file_A = os.path.join(directory, "cross_embedding_prefs.csv")
+            dfA = pd.read_csv(preferences_file_A)
+            preferences_file_B = os.path.join(directory, "same_embedding_prefs.csv")
+            dfB = pd.read_csv(preferences_file_B)
+            df = pd.concat([dfA, dfB])
 
         # Remove the withheld embodiment(s) from preference data
         for removal in self.removed_embodiments:

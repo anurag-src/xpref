@@ -17,7 +17,11 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from ml_collections import config_dict
-
+import random
+seed = 0
+np.random.seed(seed)
+torch.manual_seed(seed)
+random.seed(seed)
 ConfigDict = config_dict.ConfigDict
 XPREFS_CONFIG = get_xprefs_config()
 

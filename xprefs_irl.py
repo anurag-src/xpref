@@ -69,6 +69,7 @@ def train_xprefs():
     global_step = 0
     epoch = 0
     complete = False
+    experiment_start_time = time.time()
     iter_start_time = time.time()
     save_out = []
     losses = []
@@ -98,10 +99,10 @@ def train_xprefs():
                 if not global_step % XPREFS_CONFIG.irl.eval_every:
                     # eval_goal = eval_goal_embedding(model, goal_examples_data)
                     print("Running Validation Loop!")
-                    test_loss, test_acc = trainer.validation_loop(eval_goal, train=False)
-                    train_loss_whole_set, train_acc = trainer.validation_loop(eval_goal, train=True)
+                    test_loss, test_acc, test_time = trainer.validation_loop(eval_goal, train=False)
+                    train_loss_whole_set, train_acc, train_time = trainer.validation_loop(eval_goal, train=True)
                     print(
-                        "Iter[{}/{}] (Epoch {}), {:.6f}s/iter, Loss: {:.3f}, Test Loss: {:.3f}, Test Accuracy: {:3f}, Train Loss: {:.3f}, Train Accuracy: {:3f}".format(
+                        "Iter[{}/{}] (Epoch {}), {:.6f}s/iter, Loss: {:.3f}, Test Loss: {:.3f}, Test Accuracy: {:3f}, Train Loss: {:.3f}, Train Accuracy: {:3f}, Validation Loop Time: {:3f}s".format(
                             global_step,
                             XPREFS_CONFIG.irl.train_max_iters,
                             epoch,
@@ -110,9 +111,9 @@ def train_xprefs():
                             test_loss,
                             test_acc,
                             train_loss_whole_set,
-                            train_acc
+                            train_acc, test_time + train_time
                         ))
-                    save_out.append([global_step, epoch, train_loss.item(), test_loss, test_loss, train_loss_whole_set, train_acc])
+                    save_out.append([global_step, epoch, train_loss.item(), test_loss, test_acc, train_loss_whole_set, train_acc])
 
                 global_step += 1
                 if global_step > XPREFS_CONFIG.irl.train_max_iters:
@@ -132,6 +133,9 @@ def train_xprefs():
         data_out.columns = ["steps", "epochs", "train_loss", "test_loss", "test_acc", "training_loss", "training_acc"]
         data_out.to_csv(os.path.join(exp_dir, "embedding_train.csv"))
         np.savetxt(os.path.join(exp_dir, "goal_embedding.csv"), eval_goal.cpu().numpy(), delimiter=",")
+
+        experiment_elapsed_time = time.time() - experiment_start_time
+        print(f"Experiment Duration: {experiment_elapsed_time} seconds ({experiment_elapsed_time / 60} minutes)")
 
     print("Training terminated.")
 

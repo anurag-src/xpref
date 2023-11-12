@@ -6,6 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import torch
 import os
+import time
 from xirl.models import Resnet18LinearEncoderNet
 
 class XPrefsRewardTrainer:
@@ -90,27 +91,29 @@ class XPrefsRewardTrainer:
             raise NotImplementedError("Implement this function")
 
     def validation_loop(self, eval_goal, train=False):
-        criterion = torch.nn.CrossEntropyLoss()
-        self.model.eval()
-        cumulative_loss = 0.0
-        total_correct, total_seen = 0, 0
-        dataset = self.validation_dataset if not train else self.training_dataset
-        prefs = self.validation_preferences if not train else self.training_preferences
-        for j in range(len(prefs)):
-            o1, o2 = self.get_ith_from_preferences(prefs, dataset, j)
+        with torch.no_grad():
+            criterion = torch.nn.CrossEntropyLoss()
+            self.model.eval()
+            cumulative_loss = 0.0
+            total_correct, total_seen = 0, 0
+            dataset = self.validation_dataset if not train else self.training_dataset
+            prefs = self.validation_preferences if not train else self.training_preferences
+            validation_loop_start = time.time()
+            for j in range(len(prefs)):
+                o1, o2 = self.get_ith_from_preferences(prefs, dataset, j)
 
-            sum_reward_o1 = self.r_from_traj(o1, eval_goal, train=False)
-            sum_reward_o2 = self.r_from_traj(o2, eval_goal, train=False)
-            reward_out_pair = [sum_reward_o1, sum_reward_o2]
+                sum_reward_o1 = self.r_from_traj(o1, eval_goal, train=False)
+                sum_reward_o2 = self.r_from_traj(o2, eval_goal, train=False)
+                reward_out_pair = [sum_reward_o1, sum_reward_o2]
 
-            loss = criterion(torch.stack(reward_out_pair), torch.tensor(1).to(self.device))
-            cumulative_loss += loss.item()
+                loss = criterion(torch.stack(reward_out_pair), torch.tensor(1).to(self.device))
+                cumulative_loss += loss.item()
 
-            if sum_reward_o1.item() < sum_reward_o2.item():
-                total_correct += 1
-            total_seen += 1
+                if sum_reward_o1.item() < sum_reward_o2.item():
+                    total_correct += 1
+                total_seen += 1
 
-        return cumulative_loss / total_seen, total_correct / total_seen
+            return cumulative_loss / total_seen, total_correct / total_seen, time.time() - validation_loop_start
 
     def calculate_goal_embedding(self, goal_dataloader):
         self.model.eval()

@@ -39,6 +39,7 @@ class XPrefsRewardTrainer:
         reward_output_pairs = []
 
         # Batch the inputs to the network before calculating loss
+        # TODO: Consider shuffling
         for j in range(i, i + self.batch_size):
             if j >= len(self.training_preferences):
                 break
@@ -51,7 +52,7 @@ class XPrefsRewardTrainer:
             reward_output_pairs.append(torch.stack([sum_reward_o1, sum_reward_o2]))
 
         # Cross entropy loss over summed rewards
-        loss = self.criterion(torch.stack(reward_output_pairs), torch.tensor([1 for _ in reward_output_pairs]).to(self.device))
+        loss = self.criterion(torch.stack(reward_output_pairs), torch.tensor([0 for _ in reward_output_pairs]).to(self.device))
         loss.backward()
         self.optimizer.step()
         return loss
@@ -106,10 +107,10 @@ class XPrefsRewardTrainer:
                 sum_reward_o2 = self.r_from_traj(o2, eval_goal, train=False)
                 reward_out_pair = [sum_reward_o1, sum_reward_o2]
 
-                loss = criterion(torch.stack(reward_out_pair), torch.tensor(1).to(self.device))
+                loss = criterion(torch.stack(reward_out_pair), torch.tensor(0).to(self.device))
                 cumulative_loss += loss.item()
 
-                if sum_reward_o1.item() < sum_reward_o2.item():
+                if sum_reward_o1.item() > sum_reward_o2.item():
                     total_correct += 1
                 total_seen += 1
 

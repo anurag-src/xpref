@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-TRAINING_RESULTS = "/home/connor/Documents/Xpref/experiments/toy_e1_trial1_mediumstick_only_static_goal_cumulative_reward/embedding_train.csv"
+TRAINING_RESULTS = "/home/connor/Documents/Xpref/experiments/1699820891/embedding_train.csv"
 
 def plot_accuracy():
     df = pd.read_csv(TRAINING_RESULTS)
@@ -10,8 +10,8 @@ def plot_accuracy():
     plt.xlabel('Epochs')
     plt.ylabel('Accuracy (%)')
 
-    plt.plot(df["epochs"], df["test_acc"], label="Testing Data")
-    plt.plot(df["epochs"], df["training_acc"], label="Training Data")
+    plt.plot(df["steps"], df["test_acc"], label="Testing Data")
+    plt.plot(df["steps"], df["training_acc"], label="Training Data")
 
     plt.title("IRL Accuracy")
     plt.legend()
@@ -23,8 +23,8 @@ def plot_loss():
     plt.xlabel('Time (Epochs)')
     plt.ylabel('Dataset Loss')
 
-    plt.plot(df["epochs"], df["test_loss"], label="Testing Data")
-    plt.plot(df["epochs"], df["training_loss"], label="Training Data")
+    plt.plot(df["steps"], df["test_loss"], label="Testing Data")
+    plt.plot(df["steps"], df["training_loss"], label="Training Data")
 
     plt.title("IRL Validation Loss")
     plt.legend()
@@ -36,7 +36,7 @@ def plot_instant_loss():
     plt.xlabel('Time (Epochs)')
     plt.ylabel('Loss')
 
-    plt.plot(df["epochs"], df["train_loss"])
+    plt.plot(df["steps"], df["train_loss"])
 
     plt.title("IRL Training Loss")
     plt.legend()

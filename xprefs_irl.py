@@ -75,7 +75,7 @@ def train_xprefs():
     losses = []
     plt.ion()
 
-    print(f"Begin Training Loop with {len(training_preferences)} preferences!")
+    print(f"Begin Training Loop with {len(training_preferences)} preferences ({len(validation_preferences)} validation prefs)!")
 
     # Main Training Loop
     eval_goal = trainer.calculate_goal_embedding(goal_examples_data)

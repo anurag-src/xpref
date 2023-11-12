@@ -28,8 +28,8 @@ def get_config():
     config.data = ml_collections.ConfigDict()
     config.data.demonstrations_root = os.path.expanduser("~/Documents/Xpref/trajectoriestoy/")
     config.data.preference_type = "combined"  # Can be one of ["cross_embodiment", "same_embodiment", "combined"]
-    config.data.truncate_training_preferences = 10000
-    config.data.truncate_testing_preferences = 2000
+    config.data.truncate_training_preferences = 44
+    config.data.truncate_testing_preferences = 100
     config.data.goal_examples = os.path.expanduser("~/Documents/Xpref/goal_examples")
     config.data.truncate_goals = 200
     config.data.train_embodiments = ["mediumstick"]
@@ -74,10 +74,10 @@ def get_config():
     config.irl = ml_collections.ConfigDict()
     config.irl.learning_type = "Xprefs"  # Can be ["Xprefs", "RLHF"]
     config.irl.recompute_goal_every = None
-    config.irl.train_max_iters = 4000
-    config.irl.eval_every = 250
-    config.irl.batch_size = 20
-    config.irl.embedding_size = 32
+    config.irl.train_max_iters = 400
+    config.irl.eval_every = 44
+    config.irl.batch_size = 1
+    config.irl.embedding_size = 3
     config.irl.lr = 1e-3
     config.irl.average_learned_reward = True
     config.irl.checkpointing_frequency = 5_000

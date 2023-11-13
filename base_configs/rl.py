@@ -53,10 +53,12 @@ def get_config():
 
   config.reward_wrapper = ml_collections.ConfigDict()
   # config.reward_wrapper.pretrained_path = "/home/connor/Documents/xprefs/pretrain_runs/dataset=xmagical_mode=cross_algo=xirl_embodiment=mediumstick/"
-  config.reward_wrapper.pretrained_path = "/home/connor/Documents/Xpref/experiments/11-06-23-Traj2-Mediumstick"
 
   # Can be one of ['distance_to_goal', 'goal_classifier', 'reward_prediction_from_prefs'].
   config.reward_wrapper.type = "reward_prediction_from_prefs"
+
+  # Either a TCC model (if 'distance_to_goal') or an XPrefs model (if 'reward_prediction_from_prefs')
+  config.reward_wrapper.pretrained_path = "/home/connor/Documents/Xpref/experiments/traj2_11-12-23"
 
   # ================================================= #
   # Training parameters.

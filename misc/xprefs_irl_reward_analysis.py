@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-TRAINING_RESULTS = "/home/connor/Documents/Xpref/experiments/1699820891/embedding_train.csv"
+TRAINING_RESULTS = "/home/connor/Documents/Xpref/experiments/1699823295/embedding_train.csv"
 
 def plot_accuracy():
     df = pd.read_csv(TRAINING_RESULTS)

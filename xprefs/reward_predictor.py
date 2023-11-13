@@ -45,6 +45,8 @@ class XPrefsRewardTrainer:
                 break
 
             o1, o2 = self.get_ith_from_preferences(self.training_preferences, self.training_dataset, j)
+            assert not torch.equal(o1["frames"], o2["frames"])
+
 
             sum_reward_o1 = self.r_from_traj(o1, goal_embedding)
             sum_reward_o2 = self.r_from_traj(o2, goal_embedding)

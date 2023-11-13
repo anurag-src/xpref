@@ -59,6 +59,8 @@ def train_xprefs():
     training_trajectories = TrajectoryLoader.full_dataset_from_config(XPREFS_CONFIG, train=True)
     validation_trajectories = TrajectoryLoader.full_dataset_from_config(XPREFS_CONFIG, train=False)
 
+    #print(validation_preferences)
+
     # Load the trainer
     trainer = XPrefsRewardTrainer(XPREFS_CONFIG, exp_dir)
     trainer.attach_data_to_trainer(training_trajectories, validation_trajectories)

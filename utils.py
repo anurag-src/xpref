@@ -197,27 +197,35 @@ def wrap_learned_reward(env, config):
     pretrained_path = config.reward_wrapper.pretrained_path
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Path: {pretrained_path}")
-    model_config, model = load_model_checkpoint(pretrained_path, device)
 
-    kwargs = {
-        "env": env,
-        "model": model,
-        "device": device,
-        "res_hw": model_config.data_augmentation.image_size,
-    }
+    if config.reward_wrapper.type in ["goal_classifier", "distance_to_goal"]:
+        model_config, model = load_model_checkpoint(pretrained_path, device)
+        kwargs = {
+            "env": env,
+            "model": model,
+            "device": device,
+            "res_hw": model_config.data_augmentation.image_size,
+        }
 
-    if config.reward_wrapper.type == "goal_classifier":
-        env = wrappers.GoalClassifierLearnedVisualReward(**kwargs)
+        if config.reward_wrapper.type == "goal_classifier":
+            env = wrappers.GoalClassifierLearnedVisualReward(**kwargs)
 
-    elif config.reward_wrapper.type == "distance_to_goal":
-        kwargs["goal_emb"] = load_pickle(pretrained_path, "goal_emb.pkl")
-        kwargs["distance_scale"] = load_pickle(pretrained_path,
-                                               "distance_scale.pkl")
-        env = wrappers.DistanceToGoalLearnedVisualReward(**kwargs)
+        elif config.reward_wrapper.type == "distance_to_goal":
+            kwargs["goal_emb"] = load_pickle(pretrained_path, "goal_emb.pkl")
+            kwargs["distance_scale"] = load_pickle(pretrained_path,
+                                                   "distance_scale.pkl")
+            env = wrappers.DistanceToGoalLearnedVisualReward(**kwargs)
 
     # Reward Predictor Network
     elif config.reward_wrapper.type == "reward_prediction_from_prefs":
-        kwargs["expiriment_dir"] = "/home/connor/Documents/Xpref/experiments/11-08-23-Traj1-TestA"
+        kwargs = {
+            "env": env,
+            "expiriment_dir": pretrained_path,
+            "device": device,
+            "res_hw": load_config_from_dir(pretrained_path).data_augmentation.image_size,
+            # TODO: Fix the fact that we need a dummy model here
+            "model": torch.nn.Linear(32, 1), # This is just a dummy network to interface with XIRL
+        }
         env = wrappers.InferredFromEmbeddingReward(**kwargs)
 
     else:
@@ -255,21 +263,24 @@ def make_buffer(
     if not pretrained_path:
         return replay_buffer.ReplayBuffer(**kwargs)
 
-    model_config, model = load_model_checkpoint(pretrained_path, device)
-    kwargs["model"] = model
-    kwargs["res_hw"] = model_config.data_augmentation.image_size
+    if config.reward_wrapper.type in ["goal_classifier", "distance_to_goal"]:
+        model_config, model = load_model_checkpoint(pretrained_path, device)
+        kwargs["model"] = model
+        kwargs["res_hw"] = model_config.data_augmentation.image_size
 
-    if config.reward_wrapper.type == "goal_classifier":
-        buffer = replay_buffer.ReplayBufferGoalClassifier(**kwargs)
+        if config.reward_wrapper.type == "goal_classifier":
+            buffer = replay_buffer.ReplayBufferGoalClassifier(**kwargs)
 
-    elif config.reward_wrapper.type == "distance_to_goal":
-        kwargs["goal_emb"] = load_pickle(pretrained_path, "goal_emb.pkl")
-        kwargs["distance_scale"] = load_pickle(pretrained_path,
-                                               "distance_scale.pkl")
-        buffer = replay_buffer.ReplayBufferDistanceToGoal(**kwargs)
+        elif config.reward_wrapper.type == "distance_to_goal":
+            kwargs["goal_emb"] = load_pickle(pretrained_path, "goal_emb.pkl")
+            kwargs["distance_scale"] = load_pickle(pretrained_path,
+                                                   "distance_scale.pkl")
+            buffer = replay_buffer.ReplayBufferDistanceToGoal(**kwargs)
 
     elif config.reward_wrapper.type == "reward_prediction_from_prefs":
-        kwargs["expiriment_dir"] = "/home/connor/Documents/Xpref/experiments/11-08-23-Traj1-TestA"
+        kwargs["expiriment_dir"] = pretrained_path
+        # TODO: Fix the fact that we need a dummy model here
+        kwargs["model"] = torch.nn.Linear(32, 1)  # This is just a dummy network to interface with XIRL
         buffer = replay_buffer.ReplayBufferLearnedReward(**kwargs)
 
     else:

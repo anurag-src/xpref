@@ -233,14 +233,13 @@ class ReplayBufferLearnedReward(ReplayBufferLearnedReward):
   ):
     super().__init__(**base_kwargs)
 
-    device = "cpu"
     self.goal_embedding = self.calculate_goal_embedding(expiriment_dir)
     self.reward_predictor = Resnet18LinearEncoderNet(
       len(self.goal_embedding),
       num_ctx_frames=1,
       normalize_embeddings=False,
       learnable_temp=False,
-    ).to(device)
+    ).to(base_kwargs["device"])
     self.reward_predictor.eval()
 
     checkpoint_dir = os.path.join(expiriment_dir, "checkpoints")
@@ -259,7 +258,7 @@ class ReplayBufferLearnedReward(ReplayBufferLearnedReward):
       """Forward the pixels through the model and compute the reward."""
       image_tensors = [self._pixel_to_tensor(i) for i in self.pixels_staging]
       image_tensors = torch.cat(image_tensors, dim=1)
-      embs = self.model.infer(image_tensors).numpy().embs
+      embs = self.reward_predictor.infer(image_tensors).numpy().embs
       dists = -1.0 * np.linalg.norm(embs - self.goal_embedding, axis=-1)
       return dists
 

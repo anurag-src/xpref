@@ -13,13 +13,13 @@ CHECKPOINTS = {
     # "TCC Only (MQME 0.5)": "/home/connor/Documents/Xpref/experiments/09-26-23-TCCMQME",
     # "TCC + XPrefs (MQME 0.5)": "/home/connor/Documents/Xpref/experiments/09-26-23-TCCandXPrefs",
     # "Xprefs Only (Dynamic Goal $\phi$)" : "/home/connor/Documents/Xpref/experiments/09-26-23-XPrefsOnlyDynamicGoal",
-    "Xprefs Only (Static Goal $\phi$)" : "/home/connor/Documents/Xpref/experiments/11-08-23-toy-test-A"
+    "Xprefs Only (Static Goal $\phi$)" : "/home/connor/Documents/Xpref/experiments/1699823295"
 }
 
-EMBODIMENT_TARGETS = ["shortstick", "shortstick", "shortstick"]
-GOOD_TRAJECTORY_INDEX = 107
-BAD_TRAJECTORY_INDEX = 0
-OTHER_TRAJECTORY_INDEX = 1683
+EMBODIMENT_TARGETS = ["mediumstick", "mediumstick"]
+GOOD_TRAJECTORY_INDEX = 281
+BAD_TRAJECTORY_INDEX = 1434
+# OTHER_TRAJECTORY_INDEX = 119
 
 CONFIG = get_xprefs_config()
 EVAL_EMBODIMENTS = tuple(["gripper", "shortstick", "mediumstick", "longstick"])
@@ -39,7 +39,7 @@ def load_device():
     return device
 
 def load_preference_dataset():
-    dataset = TrajectoryLoader.full_dataset_from_config(CONFIG, True)
+    dataset = TrajectoryLoader.full_dataset_from_config(CONFIG, False)
     return dataset
 
 def calculate_goal_embedding(exp_dir, device="cuda"):
@@ -69,7 +69,7 @@ if __name__ == "__main__":
     print(len(traj_data))
     observation_1 = traj_data.get_item(EMBODIMENT_TARGETS[0], GOOD_TRAJECTORY_INDEX, eval=False)
     observation_2 = traj_data.get_item(EMBODIMENT_TARGETS[1], BAD_TRAJECTORY_INDEX, eval=False)
-    observation_3 = traj_data.get_item(EMBODIMENT_TARGETS[2], OTHER_TRAJECTORY_INDEX, eval=False)
+    # observation_3 = traj_data.get_item(EMBODIMENT_TARGETS[2], OTHER_TRAJECTORY_INDEX, eval=False)
     fig, axes = plt.subplots(nrows=len(CHECKPOINTS), ncols=1, sharex=True)
 
     i = 0
@@ -78,28 +78,28 @@ if __name__ == "__main__":
         goal_embedding = calculate_goal_embedding(CHECKPOINTS[cp], device=device)
         rewards_1 = r_from_traj(observation_1, m, goal_embedding, device=device)
         rewards_2 = r_from_traj(observation_2, m, goal_embedding, device=device)
-        rewards_3 = r_from_traj(observation_3, m, goal_embedding, device=device)
+        # rewards_3 = r_from_traj(observation_3, m, goal_embedding, device=device)
 
         x_1 = [i for i in range(len(observation_1["frames"]))]
         x_2 = [i for i in range(len(observation_2["frames"]))]
-        x_3 = [i for i in range(len(observation_3["frames"]))]
+        # x_3 = [i for i in range(len(observation_3["frames"]))]
 
         y_1 = rewards_1.cpu().numpy()
         y_2 = rewards_2.cpu().numpy()
-        y_3 = rewards_3.cpu().numpy()
+        # y_3 = rewards_3.cpu().numpy()
 
         try:
             axes[i].plot(x_1, y_1, label=cp.lower(), c="blue")
             axes[i].plot(x_2, y_2, label=cp.lower(), c="red")
-            axes[i].plot(x_3, y_3, label=cp.lower(), c="green")
+            # axes[i].plot(x_3, y_3, label=cp.lower(), c="green")
             axes[i].set_title(cp)
-            axes[i].set_ylim(min(min(y_1), min(y_2), min(y_3)), 0)
+            axes[i].set_ylim(min(min(y_1), min(y_2)), 0)
         except TypeError:
             axes.plot(x_1, y_1, label=f"{EMBODIMENT_TARGETS[0]}-{GOOD_TRAJECTORY_INDEX}", c="blue")
             axes.plot(x_2, y_2, label=f"{EMBODIMENT_TARGETS[1]}-{BAD_TRAJECTORY_INDEX}", c="red")
-            axes.plot(x_3, y_3, label=f"{EMBODIMENT_TARGETS[2]}-{OTHER_TRAJECTORY_INDEX}", c="green")
+            # axes.plot(x_3, y_3, label=f"{EMBODIMENT_TARGETS[2]}-{OTHER_TRAJECTORY_INDEX}", c="green")
             axes.set_title(cp)
-            axes.set_ylim(min(min(y_1), min(y_2), min(y_3)), 0)
+            axes.set_ylim(min(min(y_1), min(y_2)), 0)
         i += 1
 
     plt.ylabel("Negative Distance to Goal")

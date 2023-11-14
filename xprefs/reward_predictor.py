@@ -59,21 +59,14 @@ class XPrefsRewardTrainer:
         self.optimizer.step()
         return loss
 
-    def r_from_traj(self, observation, goal_embedding, train=True):
-        if not train:
-            self.model.eval()
-            with torch.no_grad():
-                o_frames = torch.stack([observation["frames"].to(self.device)])
-                embed_o = self.model(o_frames).embs.squeeze()
-                g_e = torch.squeeze(goal_embedding)
-                g_e = g_e.repeat(len(embed_o), 1)
-                goal_diff = g_e - embed_o
-                dist_to_reward_o = torch.norm(goal_diff, dim=1)
-                sum_reward_o = -torch.sum(dist_to_reward_o)
-                if self.use_average_reward:
-                    return sum_reward_o / len(embed_o)
-                return sum_reward_o
+    def validate_r_from_traj(self, observation, goal_embedding):
+        # self.model.eval()
+        with torch.no_grad():
+            r = self.r_from_traj(observation, goal_embedding)
+        # self.model.train()
+        return r
 
+    def r_from_traj(self, observation, goal_embedding):
         o_frames = torch.stack([observation["frames"].to(self.device)])
         embed_o = self.model(o_frames).embs.squeeze()
         if self.model_type == "Xprefs":
@@ -95,8 +88,6 @@ class XPrefsRewardTrainer:
 
     def validation_loop(self, eval_goal, train=False):
         with torch.no_grad():
-            criterion = torch.nn.CrossEntropyLoss()
-            self.model.eval()
             cumulative_loss = 0.0
             total_correct, total_seen = 0, 0
             dataset = self.validation_dataset if not train else self.training_dataset
@@ -105,18 +96,18 @@ class XPrefsRewardTrainer:
             for j in range(len(prefs)):
                 o1, o2 = self.get_ith_from_preferences(prefs, dataset, j)
 
-                sum_reward_o1 = self.r_from_traj(o1, eval_goal, train=False)
-                sum_reward_o2 = self.r_from_traj(o2, eval_goal, train=False)
+                sum_reward_o1 = self.validate_r_from_traj(o1, eval_goal)
+                sum_reward_o2 = self.validate_r_from_traj(o2, eval_goal)
                 reward_out_pair = [sum_reward_o1, sum_reward_o2]
 
-                loss = criterion(torch.stack(reward_out_pair), torch.tensor(0).to(self.device))
+                loss = self.criterion(torch.stack(reward_out_pair).unsqueeze(0), torch.tensor([0]).to(self.device))
                 cumulative_loss += loss.item()
 
                 if sum_reward_o1.item() > sum_reward_o2.item():
                     total_correct += 1
                 total_seen += 1
 
-            return cumulative_loss / total_seen, total_correct / total_seen, time.time() - validation_loop_start
+            return cumulative_loss / len(prefs), total_correct / total_seen, time.time() - validation_loop_start
 
     def calculate_goal_embedding(self, goal_dataloader):
         self.model.eval()

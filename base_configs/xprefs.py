@@ -29,7 +29,7 @@ def get_config():
     config.data.demonstrations_root = os.path.expanduser("~/Documents/Xpref/trajectories/")
     config.data.preference_type = "same_embodiment"  # Can be one of ["cross_embodiment", "same_embodiment", "combined"]
     config.data.truncate_training_preferences = 1000
-    config.data.truncate_testing_preferences = 1000
+    config.data.truncate_testing_preferences = 100
     config.data.goal_examples = os.path.expanduser("~/Documents/Xpref/goal_examples")
     config.data.truncate_goals = 200
     config.data.train_embodiments = ["mediumstick"]
@@ -48,7 +48,7 @@ def get_config():
     Define Information About Trajectory Sampling
     """
     config.sampler = ml_collections.ConfigDict()
-    config.sampler.stride = 3  # The stride with which to import video data
+    config.sampler.stride = 1  # The stride with which to import video data
 
     """
     Define Data Transformations
@@ -81,5 +81,6 @@ def get_config():
     config.irl.lr = 1e-3
     config.irl.average_learned_reward = True
     config.irl.checkpointing_frequency = 5_000
+    config.irl.early_terminate_after_loss_equals = 1e-4
 
     return config

@@ -58,7 +58,7 @@ def get_config():
   config.reward_wrapper.type = "reward_prediction_from_prefs"
 
   # Either a TCC model (if 'distance_to_goal') or an XPrefs model (if 'reward_prediction_from_prefs')
-  config.reward_wrapper.pretrained_path = "/home/connor/Documents/Xpref/experiments/traj2_11-12-23"
+  config.reward_wrapper.pretrained_path = "/home/connor/Documents/Xpref/experiments/traj1_11-13-23"
 
   # ================================================= #
   # Training parameters.

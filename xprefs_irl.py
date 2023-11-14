@@ -101,8 +101,8 @@ def train_xprefs():
                 if not global_step % XPREFS_CONFIG.irl.eval_every:
                     # eval_goal = eval_goal_embedding(model, goal_examples_data)
                     print("Running Validation Loop!")
-                    test_loss, test_acc, test_time = trainer.validation_loop(eval_goal, train=False)
                     train_loss_whole_set, train_acc, train_time = trainer.validation_loop(eval_goal, train=True)
+                    test_loss, test_acc, test_time = trainer.validation_loop(eval_goal, train=False)
                     print(
                         "Iter[{}/{}] (Epoch {}), {:.6f}s/iter, Loss: {:.3f}, Test Loss: {:.3f}, Test Accuracy: {:3f}, Train Loss: {:.3f}, Train Accuracy: {:3f}, Validation Loop Time: {:3f}s".format(
                             global_step,
@@ -116,6 +116,12 @@ def train_xprefs():
                             train_acc, test_time + train_time
                         ))
                     save_out.append([global_step, epoch, train_loss.item(), test_loss, test_acc, train_loss_whole_set, train_acc])
+
+                    if XPREFS_CONFIG.irl.early_terminate_after_loss_equals is not None:
+                        if train_loss_whole_set < XPREFS_CONFIG.irl.early_terminate_after_loss_equals:
+                            print("Early Termination!")
+                            complete = True
+                            break
 
                 global_step += 1
                 if global_step > XPREFS_CONFIG.irl.train_max_iters:

@@ -13,12 +13,12 @@ CHECKPOINTS = {
     # "TCC Only (MQME 0.5)": "/home/connor/Documents/Xpref/experiments/09-26-23-TCCMQME",
     # "TCC + XPrefs (MQME 0.5)": "/home/connor/Documents/Xpref/experiments/09-26-23-TCCandXPrefs",
     # "Xprefs Only (Dynamic Goal $\phi$)" : "/home/connor/Documents/Xpref/experiments/09-26-23-XPrefsOnlyDynamicGoal",
-    "Xprefs Only (Static Goal $\phi$)" : "/home/connor/Documents/Xpref/experiments/1699823295"
+    "Xprefs Only (Static Goal $\phi$)" : "/home/connor/Documents/Xpref/experiments/traj1_11-13-23"
 }
 
 EMBODIMENT_TARGETS = ["mediumstick", "mediumstick"]
-GOOD_TRAJECTORY_INDEX = 281
-BAD_TRAJECTORY_INDEX = 1434
+GOOD_TRAJECTORY_INDEX = 299
+BAD_TRAJECTORY_INDEX = 1800
 # OTHER_TRAJECTORY_INDEX = 119
 
 CONFIG = get_xprefs_config()
@@ -26,7 +26,7 @@ EVAL_EMBODIMENTS = tuple(["gripper", "shortstick", "mediumstick", "longstick"])
 CONFIG.data.pretrain_action_class = EVAL_EMBODIMENTS
 CONFIG.data.down_stream_action_class = EVAL_EMBODIMENTS
 
-X_MAGICAL_DATA_PATH = os.path.expanduser("~/Documents/Xpref/trajectoriestoy")
+X_MAGICAL_DATA_PATH = os.path.expanduser("~/Documents/Xpref/trajectories")
 CONFIG.data.root = X_MAGICAL_DATA_PATH
 
 def load_device():
@@ -39,7 +39,7 @@ def load_device():
     return device
 
 def load_preference_dataset():
-    dataset = TrajectoryLoader.full_dataset_from_config(CONFIG, False)
+    dataset = TrajectoryLoader.full_dataset_from_config(CONFIG, True)
     return dataset
 
 def calculate_goal_embedding(exp_dir, device="cuda"):

@@ -8,6 +8,7 @@ import torch
 import os
 import time
 from xirl.models import Resnet18LinearEncoderNet
+from xirl.models import ReinforcementLearningHumanFeedback
 
 class XPrefsRewardTrainer:
     """
@@ -84,7 +85,7 @@ class XPrefsRewardTrainer:
             return sum_reward_o
 
         elif self.model_type == "RLHF":
-            raise NotImplementedError("Implement this function")
+            return embed_o
 
     def validation_loop(self, eval_goal, train=False):
         with torch.no_grad():
@@ -155,7 +156,11 @@ class XPrefsRewardTrainer:
                 learnable_temp=False,
             ).to(self.device)
         elif self.model_type == "RLHF":
-            raise NotImplementedError("Need to implement end-to-end network for RLHF")
+            return Reinf(
+                num_ctx_frames=1,
+                normalize_embeddings=False,
+                learnable_temp=False,
+            ).to(self.device)
         else:
             raise Exception(f"Unknown Model type: {self.model_type}")
 

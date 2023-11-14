@@ -176,6 +176,21 @@ class PreferenceRewardPredictor(nn.Module):
     return self.predictor(x)
 
 
+class ReinforcementLearningHumanFeedback(SelfSupervisedModel):
+  """A resnet18 backbone with a binary classification head."""
+
+  def __init__(self, *args, **kwargs):
+    super().__init__(*args, **kwargs)
+
+    # Visual backbone.
+    resnet = models.resnet18(pretrained=True)
+    num_ftrs = resnet.fc.in_features
+    layers_ = list(resnet.children())[:-1]
+    self.backbone = nn.Sequential(*layers_)
+
+    # Classification head.
+    self.encoder = nn.Linear(num_ftrs, 1)
+
 class Resnet18RawImageNetFeaturesNet(SelfSupervisedModel):
   """A resnet18 backbone with an identity encoder head."""
 

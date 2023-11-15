@@ -357,7 +357,7 @@ class InferredFromEmbeddingReward(LearnedVisualReward):
         normalize_embeddings=False,
         learnable_temp=False,
     ).to(device)
-    self.reward_predictor.eval()
+    # self.reward_predictor.eval()
 
     checkpoint_dir = os.path.join(expiriment_dir, "checkpoints")
     checkpoint_manager = CheckpointManager(

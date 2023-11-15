@@ -85,7 +85,7 @@ class XPrefsRewardTrainer:
             return sum_reward_o
 
         elif self.model_type == "RLHF":
-            return embed_o
+            return torch.sum(embed_o)/len(embed_o)
 
     def validation_loop(self, eval_goal, train=False):
         with torch.no_grad():

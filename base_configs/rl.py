@@ -58,7 +58,7 @@ def get_config():
   config.reward_wrapper.type = "reward_prediction_from_prefs"
 
   # Either a TCC model (if 'distance_to_goal') or an XPrefs model (if 'reward_prediction_from_prefs')
-  config.reward_wrapper.pretrained_path = "/home/connor/Documents/Xpref/experiments/traj1_mediumstickonly_1000prefs"
+  config.reward_wrapper.pretrained_path = "/home/connor/Documents/Xpref/experiments/traj1_mediumstickonly_10000prefs"
 
   # ================================================= #
   # Training parameters.
@@ -75,7 +75,7 @@ def get_config():
   # ================================================= #
   # SAC parameters.
   # ================================================= #
-  config.sac = ml_collections.ConfigDict()
+  config.sac = ml_collections.ConfigDict(1)
 
   config.sac.obs_dim = obs_dim
   config.sac.action_dim = action_dim

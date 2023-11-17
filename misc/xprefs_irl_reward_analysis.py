@@ -4,7 +4,7 @@ import pandas as pd
 from xprefs.pref_loader import PreferenceLoader
 from base_configs.xprefs import get_config as get_xprefs_config
 
-TRAINING_RESULTS = "/home/connor/Documents/Xpref/experiments/traj1_11-13-23/embedding_train.csv"
+TRAINING_RESULTS = "/home/connor/Documents/Xpref/experiments/traj1_mediumstickonly_1000prefs/embedding_train.csv"
 
 def plot_accuracy():
     df = pd.read_csv(TRAINING_RESULTS)

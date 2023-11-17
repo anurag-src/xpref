@@ -28,7 +28,7 @@ def get_config():
     config.data = ml_collections.ConfigDict()
     config.data.demonstrations_root = os.path.expanduser("~/Documents/Xpref/trajectories/")
     config.data.preference_type = "same_embodiment"  # Can be one of ["cross_embodiment", "same_embodiment", "combined"]
-    config.data.truncate_training_preferences = 1000
+    config.data.truncate_training_preferences = 5000
     config.data.truncate_testing_preferences = 1000
     config.data.goal_examples = os.path.expanduser("~/Documents/Xpref/goal_examples")
     config.data.truncate_goals = 200

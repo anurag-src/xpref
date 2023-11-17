@@ -44,6 +44,7 @@ flags.DEFINE_string("env_name", None, "The environment name.")
 flags.DEFINE_integer("seed", 0, "RNG seed.")
 flags.DEFINE_string("device", "cuda:0", "The compute device.")
 flags.DEFINE_boolean("resume", False, "Resume experiment from last checkpoint.")
+flags.DEFINE_bool("ground_truth",False,"using ground truth or not")
 
 config_flags.DEFINE_config_file(
     "config",
@@ -56,6 +57,7 @@ def evaluate(
         policy,
         env,
         num_episodes,
+        ground_truth,
         train_step=0
 ):
     """Evaluate the policy and dump rollout videos to disk."""
@@ -72,9 +74,10 @@ def evaluate(
             action = policy.act(observation, sample=False)
             observation, reward, done, info = env.step(action)
             episode_learned_rewards.append(reward)
-            episode_gt_rewards.append(info["env_reward"])
-
-        eval_gt.append(sum(episode_gt_rewards))
+            if not ground_truth:
+                episode_gt_rewards.append(info["env_reward"])
+        if not ground_truth:
+            eval_gt.append(sum(episode_gt_rewards))
         eval_learned_r.append(sum(episode_learned_rewards))
         for k, v in info["episode"].items():
             stats[k].append(v)
@@ -82,8 +85,10 @@ def evaluate(
             stats["eval_score"].append(info["eval_score"])
     for k, v in stats.items():
         stats[k] = np.mean(v)
-
-    return stats, [np.mean(eval_gt), np.mean(eval_learned_r), train_step]
+    if not ground_truth:
+        return stats, [np.mean(eval_gt), np.mean(eval_learned_r), train_step]
+    else:
+        return stats, [np.mean(eval_learned_r),train_step]
 
 
 @experiment.pdb_fallback
@@ -91,7 +96,7 @@ def main(_):
     # Make sure we have a valid config that inherits all the keys defined in the
     # base config.
     validate_config(FLAGS.config, mode="rl")
-
+    ground_truth = FLAGS.ground_truth
     config = FLAGS.config
     exp_dir = osp.join(
         config.save_dir,
@@ -130,9 +135,9 @@ def main(_):
         frame_stack=config.frame_stack,
         save_dir=osp.join(exp_dir, "video", "eval"),
     )
-
-    env = utils.wrap_learned_reward(env, FLAGS.config)
-    eval_env = utils.wrap_learned_reward(eval_env, FLAGS.config)
+    if not ground_truth:
+        env = utils.wrap_learned_reward(env, FLAGS.config)
+        eval_env = utils.wrap_learned_reward(eval_env, FLAGS.config)
 
     # Dynamically set observation and action space values.
     config.sac.obs_dim = env.observation_space.shape[0]
@@ -206,7 +211,7 @@ def main(_):
                     logger.flush()
 
             if (i + 1) % config.eval_frequency == 0:
-                eval_stats, csv_line = evaluate(policy, eval_env, config.num_eval_episodes, train_step=i)
+                eval_stats, csv_line = evaluate(policy, eval_env, config.num_eval_episodes, ground_truth, train_step=i)
                 output_tracking.append(csv_line)
                 for k, v in eval_stats.items():
                     logger.log_scalar(

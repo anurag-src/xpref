@@ -87,14 +87,14 @@ class XPrefsRewardTrainer:
         elif self.model_type == "RLHF":
             return torch.sum(embed_o)/len(embed_o)
 
-    def validation_loop(self, eval_goal, train=False):
+    def validation_loop(self, eval_goal, truncate, train=False):
         with torch.no_grad():
             cumulative_loss = 0.0
             total_correct, total_seen = 0, 0
             dataset = self.validation_dataset if not train else self.training_dataset
             prefs = self.validation_preferences if not train else self.training_preferences
             validation_loop_start = time.time()
-            for j in range(len(prefs)):
+            for j in range(truncate):
                 o1, o2 = self.get_ith_from_preferences(prefs, dataset, j)
 
                 sum_reward_o1 = self.validate_r_from_traj(o1, eval_goal)

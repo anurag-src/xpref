@@ -58,7 +58,7 @@ def get_config():
   config.reward_wrapper.type = "reward_prediction_from_prefs"
 
   # Either a TCC model (if 'distance_to_goal') or an XPrefs model (if 'reward_prediction_from_prefs')
-  config.reward_wrapper.pretrained_path = "/home/connor/Documents/Xpref/experiments/traj1_mediumstickonly_1000prefs"
+  config.reward_wrapper.pretrained_path = "/home/masters3/Documents/Xpref/experiments/traj_num_cross_20k"
 
   # ================================================= #
   # Training parameters.
@@ -81,7 +81,7 @@ def get_config():
   config.sac.action_dim = action_dim
   config.sac.action_range = action_range
   config.sac.discount = 0.99
-  config.sac.init_temperature = 0.1
+  config.sac.init_temperature = 0.2
   config.sac.alpha_lr = 1e-4
   config.sac.alpha_betas = [0.9, 0.999]
   config.sac.actor_lr = 1e-4
@@ -92,7 +92,7 @@ def get_config():
   config.sac.critic_tau = 0.005
   config.sac.critic_target_update_frequency = 2
   config.sac.batch_size = 1024
-  config.sac.learnable_temperature = True
+  config.sac.learnable_temperature = False
 
   # ================================================= #
   # Critic parameters.

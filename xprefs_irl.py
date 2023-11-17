@@ -56,6 +56,7 @@ def train_xprefs():
     # Load the preference data from the config using a Dataloader, returns pandas Dataframe
     training_preferences = PreferenceLoader(XPREFS_CONFIG, train=True).preferences
     validation_preferences = PreferenceLoader(XPREFS_CONFIG, train=False).preferences
+    #training_validation_loop_preferences = PreferenceLoader(XPREFS_CONFIG,train=True,truncate)
     training_trajectories = TrajectoryLoader.full_dataset_from_config(XPREFS_CONFIG, train=True)
     validation_trajectories = TrajectoryLoader.full_dataset_from_config(XPREFS_CONFIG, train=False)
 
@@ -101,7 +102,7 @@ def train_xprefs():
                 if not global_step % XPREFS_CONFIG.irl.eval_every:
                     # eval_goal = eval_goal_embedding(model, goal_examples_data)
                     print("Running Validation Loop!")
-                    train_loss_whole_set, train_acc, train_time = trainer.validation_loop(eval_goal, train=True)
+                    train_loss_whole_set, train_acc, train_time = trainer.validation_loop(eval_goal, XPREFS_CONFIG.data.truncate_validation_loop, train=True)
                     test_loss, test_acc, test_time = trainer.validation_loop(eval_goal, train=False)
                     print(
                         "Iter[{}/{}] (Epoch {}), {:.6f}s/iter, Loss: {:.3f}, Test Loss: {:.3f}, Test Accuracy: {:3f}, Train Loss: {:.3f}, Train Accuracy: {:3f}, Validation Loop Time: {:3f}s".format(

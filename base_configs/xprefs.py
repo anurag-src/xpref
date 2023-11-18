@@ -28,7 +28,7 @@ def get_config():
     config.data = ml_collections.ConfigDict()
     config.data.demonstrations_root = os.path.expanduser("~/Documents/Xpref/trajectories_num_blocks/")
     config.data.preference_type = "cross_embodiment"  # Can be one of ["cross_embodiment", "same_embodiment", "combined"]
-    config.data.truncate_training_preferences = 20000
+    config.data.truncate_training_preferences = 1000
     config.data.truncate_validation_loop = 1000
     config.data.truncate_testing_preferences = 1000
     config.data.goal_examples = os.path.expanduser("~/Documents/Xpref/goal_examples")
@@ -73,7 +73,7 @@ def get_config():
     Define IRL Parameters
     """
     config.irl = ml_collections.ConfigDict()
-    config.irl.learning_type = "Xprefs"  # Can be ["Xprefs", "RLHF"]
+    config.irl.learning_type = "RLHF"  # Can be ["Xprefs", "RLHF"]
     config.irl.recompute_goal_every = None
     config.irl.train_max_iters = 4000
     config.irl.eval_every = 100

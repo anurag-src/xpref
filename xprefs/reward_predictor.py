@@ -156,7 +156,7 @@ class XPrefsRewardTrainer:
                 learnable_temp=False,
             ).to(self.device)
         elif self.model_type == "RLHF":
-            return Reinf(
+            return ReinforcementLearningHumanFeedback(
                 num_ctx_frames=1,
                 normalize_embeddings=False,
                 learnable_temp=False,

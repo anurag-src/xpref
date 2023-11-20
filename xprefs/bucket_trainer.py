@@ -48,7 +48,6 @@ class XPrefsRewardTrainer:
             o1, o2 = self.get_ith_from_preferences(self.training_preferences, self.training_dataset, j)
             assert not torch.equal(o1["frames"], o2["frames"])
 
-
             sum_reward_o1 = self.r_from_traj(o1, goal_embedding)
             sum_reward_o2 = self.r_from_traj(o2, goal_embedding)
 
@@ -111,7 +110,7 @@ class XPrefsRewardTrainer:
             return cumulative_loss / len(prefs), total_correct / total_seen, time.time() - validation_loop_start
 
     def calculate_goal_embedding(self, goal_dataloader):
-        # self.model.eval()
+        self.model.eval()
         with torch.no_grad():
             sum = None
             total_embeddings = 0
@@ -123,7 +122,7 @@ class XPrefsRewardTrainer:
                     sum = torch.sum(out, dim=0)
                 else:
                     sum += torch.sum(out, dim=0)
-        # self.model.train()
+        self.model.train()
         # Average the sum of embeddings
         return sum / total_embeddings
 

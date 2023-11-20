@@ -49,11 +49,9 @@ def calculate_goal_embedding(exp_dir, device="cuda"):
 
 def load_model(checkpoint_dir):
     m = XPrefsRewardTrainer(CONFIG, checkpoint_dir).model
-    m.eval()
     return m
 
 def r_from_traj(observation, model, goal_embedding, device):
-    model.eval()
     with torch.no_grad():
         o_frames = torch.stack([observation["frames"].to(device)])
         embed_o = model(o_frames).embs.squeeze()

@@ -17,7 +17,6 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from ml_collections import config_dict
-from xprefs.calculate_kappa import calculate_normalization_denominator
 import random
 seed = 0
 np.random.seed(seed)
@@ -50,7 +49,7 @@ def create_experiment_dir(name=None):
     return exp_dir
 
 
-def train_xprefs():
+def train_tcc_bucket():
     # Create an experiment for the trial
     exp_dir = create_experiment_dir()
 
@@ -104,7 +103,7 @@ def train_xprefs():
                     # eval_goal = eval_goal_embedding(model, goal_examples_data)
                     print("Running Validation Loop!")
                     train_loss_whole_set, train_acc, train_time = trainer.validation_loop(eval_goal, XPREFS_CONFIG.data.truncate_validation_loop, train=True)
-                    test_loss, test_acc, test_time = trainer.validation_loop(eval_goal, 1000, train=False)
+                    test_loss, test_acc, test_time = trainer.validation_loop(eval_goal, train=False)
                     print(
                         "Iter[{}/{}] (Epoch {}), {:.6f}s/iter, Loss: {:.3f}, Test Loss: {:.3f}, Test Accuracy: {:3f}, Train Loss: {:.3f}, Train Accuracy: {:3f}, Validation Loop Time: {:3f}s".format(
                             global_step,
@@ -146,9 +145,6 @@ def train_xprefs():
 
         experiment_elapsed_time = time.time() - experiment_start_time
         print(f"Experiment Duration: {experiment_elapsed_time} seconds ({experiment_elapsed_time / 60} minutes)")
-
-        # Calculate Normalization Terms for RL
-        calculate_normalization_denominator(exp_dir)
 
     print("Training terminated.")
 

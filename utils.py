@@ -78,6 +78,14 @@ def load_config_from_dir(
         return
     return ConfigDict(cfg)
 
+def extract_kappa_from_exp(
+        exp_dir,
+):
+    """Load experiment config."""
+    with open(os.path.join(exp_dir, "normalize_embedding.yaml"), "r") as fp:
+        cfg = yaml.load(fp, Loader=yaml.FullLoader)
+    return cfg["kappa"]
+
 
 def dump_config(exp_dir, config):
     """Dump config to disk."""

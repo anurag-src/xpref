@@ -45,7 +45,7 @@ def main(_):
     env = utils.make_env(env_name, seed=0)
 
     # Reward learning wrapper.
-    if FLAGS.config.reward_wrapper.pretrained_path is not None:
+    if FLAGS.config.reward_wrapper.type is not None:
         env = utils.wrap_learned_reward(env, FLAGS.config)
 
     viewer = KeyboardEnvInteractor(action_dim=env.action_space.shape[0])
@@ -59,14 +59,17 @@ def main(_):
 
     i = [0]
     rews = []
+    ONLY_UPDATE_PLOT_ON_STEP = True
 
 
     if LIVE_REWARD:
         plt.ion()
 
     def step(action):
+        print(action)
         obs, rew, done, info = env.step(action)
-        rews.append(rew)
+        if not ONLY_UPDATE_PLOT_ON_STEP or sum(action) != 0.0:
+            rews.append(rew)
         if LIVE_REWARD:
             plt.clf()
             plt.plot(rews)

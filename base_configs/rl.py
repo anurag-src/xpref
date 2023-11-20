@@ -54,11 +54,14 @@ def get_config():
   config.reward_wrapper = ml_collections.ConfigDict()
   # config.reward_wrapper.pretrained_path = "/home/connor/Documents/xprefs/pretrain_runs/dataset=xmagical_mode=cross_algo=xirl_embodiment=mediumstick/"
 
-  # Can be one of ['distance_to_goal', 'goal_classifier', 'reward_prediction_from_prefs'].
+  # Can be one of ['distance_to_goal', 'goal_classifier', 'reward_prediction_from_prefs', None].
   config.reward_wrapper.type = "reward_prediction_from_prefs"
+  # config.reward_wrapper.type = "distance_to_goal"
+  # config.reward_wrapper.type = None
 
   # Either a TCC model (if 'distance_to_goal') or an XPrefs model (if 'reward_prediction_from_prefs')
-  config.reward_wrapper.pretrained_path = "/home/connor/Documents/Xpref/experiments/traj1_mediumstickonly_10000prefs"
+  config.reward_wrapper.pretrained_path = os.path.expanduser("~/Documents/Xpref/experiments/traj_num_cross_20k/")
+  # config.reward_wrapper.pretrained_path = os.path.expanduser("~/Documents/Xpref/pretrain_runs/tcc_mediumstick/")
 
   # ================================================= #
   # Training parameters.
@@ -75,7 +78,7 @@ def get_config():
   # ================================================= #
   # SAC parameters.
   # ================================================= #
-  config.sac = ml_collections.ConfigDict(1)
+  config.sac = ml_collections.ConfigDict()
 
   config.sac.obs_dim = obs_dim
   config.sac.action_dim = action_dim

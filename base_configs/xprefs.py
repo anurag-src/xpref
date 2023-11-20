@@ -26,9 +26,9 @@ def get_config():
     Specify Training Data
     """
     config.data = ml_collections.ConfigDict()
-    config.data.demonstrations_root = os.path.expanduser("~/Documents/Xpref/trajectories_num_blocks/")
-    config.data.preference_type = "cross_embodiment"  # Can be one of ["cross_embodiment", "same_embodiment", "combined"]
-    config.data.truncate_training_preferences = 20000
+    config.data.demonstrations_root = os.path.expanduser("~/Documents/Xpref/trajectories/")
+    config.data.preference_type = "combined"  # Can be one of ["cross_embodiment", "same_embodiment", "combined"]
+    config.data.truncate_training_preferences = 5000
     config.data.truncate_validation_loop = 1000
     config.data.truncate_testing_preferences = 1000
     config.data.goal_examples = os.path.expanduser("~/Documents/Xpref/goal_examples")
@@ -58,10 +58,10 @@ def get_config():
     config.data_augmentation.image_size = (112, 112)
     config.data_augmentation.train_transforms = [
         "global_resize",
-        # "random_resized_crop",
-        # "color_jitter",
-        # "grayscale",
-        # "gaussian_blur",
+        "random_resized_crop",
+        "color_jitter",
+        "grayscale",
+        "gaussian_blur",
         # "normalize",
     ]
     config.data_augmentation.eval_transforms = [

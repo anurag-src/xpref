@@ -55,12 +55,12 @@ def get_config():
   # config.reward_wrapper.pretrained_path = "/home/connor/Documents/xprefs/pretrain_runs/dataset=xmagical_mode=cross_algo=xirl_embodiment=mediumstick/"
 
   # Can be one of ['distance_to_goal', 'goal_classifier', 'reward_prediction_from_prefs', None].
-  config.reward_wrapper.type = "reward_prediction_from_prefs"
-  # config.reward_wrapper.type = "distance_to_goal"
+  # config.reward_wrapper.type = "reward_prediction_from_prefs"
+  config.reward_wrapper.type = "distance_to_goal"
   # config.reward_wrapper.type = None
 
   # Either a TCC model (if 'distance_to_goal') or an XPrefs model (if 'reward_prediction_from_prefs')
-  config.reward_wrapper.pretrained_path = os.path.expanduser("~/Documents/Xpref/experiments/traj_num_cross_20k/")
+  config.reward_wrapper.pretrained_path = os.path.expanduser("~/Documents/Xpref/experiments/tcc_bucket_batch_32/")
   # config.reward_wrapper.pretrained_path = os.path.expanduser("~/Documents/Xpref/pretrain_runs/tcc_mediumstick/")
 
 

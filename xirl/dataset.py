@@ -139,8 +139,16 @@ class VideoDataset(Dataset):
         Returns:
           A path to a video to sample in the dataset.
         """
+        # print("Query! --> ", self.class_names[class_idx], vid_idx)
         action_class = list(self._dir_tree)[class_idx]
-        return self._dir_tree[action_class][vid_idx]
+        try:
+            return self._dir_tree[action_class][vid_idx]
+        except Exception as e:
+            print(e)
+            print("The following query failed!")
+            print("Query! --> ", self.class_names[class_idx], vid_idx)
+            print("Tree! --> ", self._dir_tree[action_class])
+            raise Exception("Program Terminated by custom exception")
 
     def _get_data(self, vid_path):
         """Load video data given a video path.
@@ -288,6 +296,7 @@ class GoalExampleDataset(Dataset):
 
         threaded_func(get_image, enumerate(frame_paths), True)
         frames = np.stack(frames)  # Shape: (S * X, H, W, C)
+        print(frames.shape)
 
         frame_idxs = np.asarray(sample["frame_idxs"], dtype=np.int64)
 
@@ -310,3 +319,45 @@ class GoalExampleDataset(Dataset):
         return {
             str(SequenceType.FRAMES): image[SequenceType.FRAMES]
         }
+
+class RewardAwareDataset(VideoDataset):
+    """
+    Given a Video Dataset, extract the G.T. reward and save a similar tree structure containing that information
+    """
+    def __init__(self,
+            root_dir,
+            frame_sampler,
+            augmentor=None,
+            max_vids_per_class=-1,
+            seed=None,
+            debug=False
+         ):
+
+        print("Initialized Reward Dataset...")
+        super().__init__(root_dir, frame_sampler, augmentor, max_vids_per_class, seed)
+        print("Extracting Reward Information from Video Dataset...")
+        self.reward_set = self.create_reward_dataset()
+
+    def create_reward_dataset(self):
+        tree = self._dir_tree
+        reward_data = []
+        for embodiment_class in tree:
+            for i, p in enumerate(tree[embodiment_class]):
+                try:
+                    reward_file_name = "rewards.json"
+                    osf = os.path.join(p, reward_file_name)
+                    with open(osf, "r") as f:
+                        rewards = eval(f.readlines()[0])
+                    # reward_data.append((sum(rewards), embodiment_class, p))
+                    # reward_data.append((max(rewards) * 3.0, embodiment_class, p))
+                    embodiment_index = self.class_names.index(embodiment_class[embodiment_class.rfind("/") + 1:])
+
+                    # Note: i is the index into the training set, NOT the ID of the trajectory, per video_samplers.py
+                    reward_data.append((sum(rewards) / len(rewards), embodiment_index, i))
+                except Exception as e:
+                    raise Exception(f"Could not extract reward information: {e}")
+        reward_data.sort()
+        print(reward_data[-10:])
+        return reward_data
+
+

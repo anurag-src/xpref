@@ -386,7 +386,7 @@ class InferredFromEmbeddingReward(LearnedVisualReward):
         """Forward the pixels through the model and compute the reward."""
         image_tensor = self._to_tensor(image)
         embs = self.reward_predictor.infer(image_tensor).numpy().embs
-        dist_to_goal = -(1.0 / self.kappa) * np.linalg.norm(embs - self.goal_embedding)
+        dist_to_goal = -(1.0 / self.kappa) * (np.linalg.norm(embs - self.goal_embedding))
         return dist_to_goal
 
     def calculate_goal_embedding(self, exp_dir, device="cuda"):

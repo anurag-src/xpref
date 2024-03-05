@@ -70,4 +70,4 @@ Connor Mattson
 """
 
 if __name__ == "__main__":
-    calculate_normalization_denominator("/home/connor/Documents/Xpref/experiments/traj_num_cross_20k")
+    calculate_normalization_denominator("/home/connor/Documents/Xpref/experiments/traj_num_blocks_cross_11-20-23")

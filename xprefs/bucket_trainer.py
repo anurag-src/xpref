@@ -1,184 +1,181 @@
-from torchkit import CheckpointManager
+"""
+TODO: Implement Bucket TCC
 
-from xirl import factory
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-import torch
+Goals:
+1. Understand where TCC loss is being computed [DONE]
+2. Understand how pairwise assignment in TCC dataloading works [DONE]
+3. Parse Trajectories into buckets
+4. Load Bucket-based data into TCC
+"""
+
 import os
 import time
-from xirl.models import Resnet18LinearEncoderNet
-from xirl.models import ReinforcementLearningHumanFeedback
+import torch
+import yaml
 
-class XPrefsRewardTrainer:
-    """
-    Trains an embedding model based off preferences alone and returns predictions
-    """
-    def __init__(self, config, exp_dir, force_device=None):
-        self.config = config
-        self.exp_dir = exp_dir
-        self.model_type = self.config.irl.learning_type
-        self.device = self.load_device() if force_device is None else force_device
-        self.model = self.initialize_model()
-        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.config.irl.lr)
-        self.criterion = torch.nn.CrossEntropyLoss()
-        self.batch_size = config.irl.batch_size
-        self.use_average_reward = config.irl.average_learned_reward
-        self.load_checkpoint_manager()
-        self.training_dataset = None
-        self.validation_dataset = None
-        self.training_preferences = None
-        self.validation_preferences = None
+from configs.xmagical.pretraining.tcc import get_config
+from xirl import factory
+from torchkit import CheckpointManager
+from xirl.losses import compute_tcc_loss
+import pandas as pd
+from utils import setup_experiment, ConfigDict
 
-    def train_xprefs_pair(self, i, goal_embedding):
-        """
-        Assumes o2 is preferred to o1
-        """
-        self.model.train()
-        self.optimizer.zero_grad()
+# XIRL_CONFIG_FILE = "base_configs/pretrain.py"
+CONFIG = get_config()
+EXPERIMENT_DIRECTORY = os.path.expanduser("~/Documents/Xpref/experiments")
 
-        reward_output_pairs = []
+def load_device():
+    device = (
+        "cuda"
+        if torch.cuda.is_available()
+        else "mps"
+        if torch.backends.mps.is_available()
+        else "cpu"
+    )
+    # device = "cpu"
+    return device
 
-        # Batch the inputs to the network before calculating loss
-        # TODO: Consider shuffling
-        for j in range(i, i + self.batch_size):
-            if j >= len(self.training_preferences):
-                break
+def load_dataset(split_type="train", debug=False):
+    use_buckets = split_type == "train"
+    dataset = factory.dataset_from_config(CONFIG, False, split_type, debug, with_reward=use_buckets)
+    print("type: ", type(dataset))
+    if use_buckets:
+        print("Dataset built!")
+        print(len(dataset.reward_set))
 
-            o1, o2 = self.get_ith_from_preferences(self.training_preferences, self.training_dataset, j)
-            assert not torch.equal(o1["frames"], o2["frames"])
+    if use_buckets:
+        batch_sampler = factory.video_sampler_from_config(
+            CONFIG, dataset.dir_tree, downstream=False, sequential=debug, rewards=dataset.reward_set)
+    else:
+        batch_sampler = factory.video_sampler_from_config(
+            CONFIG, dataset.dir_tree, downstream=False, sequential=debug)
 
-            sum_reward_o1 = self.r_from_traj(o1, goal_embedding)
-            sum_reward_o2 = self.r_from_traj(o2, goal_embedding)
+    return torch.utils.data.DataLoader(
+        dataset,
+        collate_fn=dataset.collate_fn,
+        batch_sampler=batch_sampler,
+        num_workers=4 if torch.cuda.is_available() and not debug else 0,
+        pin_memory=torch.cuda.is_available() and not debug,
+    )
 
-            reward_output_pairs.append(torch.stack([sum_reward_o1, sum_reward_o2]))
+def load_model():
+    return factory.model_from_config(CONFIG)
 
-        # Cross entropy loss over summed rewards
-        loss = self.criterion(torch.stack(reward_output_pairs), torch.tensor([0 for _ in reward_output_pairs]).to(self.device))
-        loss.backward()
-        self.optimizer.step()
-        return loss
+def load_tcc_optimizer(model):
+    return factory.optim_from_config(config=CONFIG, model=model)
 
-    def validate_r_from_traj(self, observation, goal_embedding):
-        # self.model.eval()
-        with torch.no_grad():
-            r = self.r_from_traj(observation, goal_embedding)
-        # self.model.train()
-        return r
+def load_trainer(model, optimizer, device):
+    return factory.trainer_from_config(CONFIG, model, optimizer, device)
 
-    def r_from_traj(self, observation, goal_embedding):
-        o_frames = torch.stack([observation["frames"].to(self.device)])
-        embed_o = self.model(o_frames).embs.squeeze()
-        if self.model_type == "Xprefs":
-            g_e = torch.squeeze(goal_embedding)
-            g_e = g_e.repeat(len(embed_o), 1)
-            goal_diff = g_e - embed_o
-            dist_to_reward_o = torch.norm(goal_diff, dim=1)
+def tcc_loss(embs, batch):
+    steps = batch["frame_idxs"].to(load_device())
+    seq_lens = batch["video_len"].to(load_device())
 
-            # Reward is the negative distance to goal
-            sum_reward_o = -torch.sum(dist_to_reward_o)
+    # Dynamically determine the number of cycles if using stochastic
+    # matching.
+    batch_size, num_cc_frames = embs.shape[:2]
+    num_cycles = int(batch_size * num_cc_frames)
 
-            if self.use_average_reward:
-                return sum_reward_o / len(embed_o)
+    config = CONFIG
+    return compute_tcc_loss(
+        embs=embs,
+        idxs=steps,
+        seq_lens=seq_lens,
+        stochastic_matching=config.loss.tcc.stochastic_matching,
+        normalize_embeddings=config.model.normalize_embeddings,
+        loss_type=config.loss.tcc.loss_type,
+        similarity_type=config.loss.tcc.similarity_type,
+        num_cycles=num_cycles,
+        cycle_length=config.loss.tcc.cycle_length,
+        temperature=config.loss.tcc.softmax_temperature,
+        label_smoothing=config.loss.tcc.label_smoothing,
+        variance_lambda=config.loss.tcc.variance_lambda,
+        huber_delta=config.loss.tcc.huber_delta,
+        normalize_indices=config.loss.tcc.normalize_indices,
+    )
 
-            return sum_reward_o
+def create_experiment_dir(name=None):
+    if not os.path.exists(EXPERIMENT_DIRECTORY):
+        os.makedirs(EXPERIMENT_DIRECTORY)
+    if name is None:
+        name = "tcc_" + str(int(time.time()))
+    exp_dir = os.path.join(EXPERIMENT_DIRECTORY, name)
+    os.makedirs(exp_dir)
+    with open(os.path.join(exp_dir, "config.yaml"), "w") as fp:
+        yaml.dump(ConfigDict.to_dict(CONFIG), fp)
+    return exp_dir
 
-        elif self.model_type == "RLHF":
-            return torch.sum(embed_o)/len(embed_o)
+def train_one_iteration(model, optimizer, criterion, batch, device="cuda"):
+    model.train()
+    optimizer.zero_grad()
 
-    def validation_loop(self, eval_goal, truncate, train=False):
-        with torch.no_grad():
-            cumulative_loss = 0.0
-            total_correct, total_seen = 0, 0
-            dataset = self.validation_dataset if not train else self.training_dataset
-            prefs = self.validation_preferences if not train else self.training_preferences
-            validation_loop_start = time.time()
-            for j in range(truncate):
-                o1, o2 = self.get_ith_from_preferences(prefs, dataset, j)
+    frames = batch["frames"].to(device)
+    out = model(frames)
 
-                sum_reward_o1 = self.validate_r_from_traj(o1, eval_goal)
-                sum_reward_o2 = self.validate_r_from_traj(o2, eval_goal)
-                reward_out_pair = [sum_reward_o1, sum_reward_o2]
+    loss = criterion(out.embs, batch)
+    loss.backward()
+    optimizer.step()
+    return loss
 
-                loss = self.criterion(torch.stack(reward_out_pair).unsqueeze(0), torch.tensor([0]).to(self.device))
-                cumulative_loss += loss.item()
+def train_bucket_tcc():
+    device = load_device()
+    print(f"Using {device} device")
 
-                if sum_reward_o1.item() > sum_reward_o2.item():
-                    total_correct += 1
-                total_seen += 1
+    model = load_model().to(device)
+    optimizer = load_tcc_optimizer(model)
+    trainer = load_trainer(model, optimizer, device)
+    exp_dir = create_experiment_dir()
+    # setup_experiment(exp_dir, CONFIG, True)
 
-            return cumulative_loss / len(prefs), total_correct / total_seen, time.time() - validation_loop_start
+    checkpoint_dir = os.path.join(exp_dir, "checkpoints")
+    checkpoint_manager = CheckpointManager(
+        checkpoint_dir,
+        model=model,
+        optimizer=optimizer,
+    )
 
-    def calculate_goal_embedding(self, goal_dataloader):
-        self.model.eval()
-        with torch.no_grad():
-            sum = None
-            total_embeddings = 0
-            for batch in goal_dataloader:
-                frames = batch["frames"].to(self.device)
-                out = self.model(frames).embs
-                total_embeddings += len(out)
-                if sum is None:
-                    sum = torch.sum(out, dim=0)
-                else:
-                    sum += torch.sum(out, dim=0)
-        self.model.train()
-        # Average the sum of embeddings
-        return sum / total_embeddings
+    batch_loaders = {
+        "train": load_dataset("train", debug=False),
+        "valid": load_dataset("valid", debug=False)
+    }
 
-    def load_checkpoint_manager(self):
-        checkpoint_dir = os.path.join(self.exp_dir, "checkpoints")
-        self.checkpoint_manager = CheckpointManager(
-            checkpoint_dir,
-            model=self.model,
-        )
-        global_step = self.checkpoint_manager.restore_or_initialize()
-        return global_step
+    global_step = checkpoint_manager.restore_or_initialize()
+    total_batches = max(1, len(batch_loaders["train"]))
+    epoch = int(global_step / total_batches)
+    complete = False
 
-    def save_checkpoint(self, i):
-        self.checkpoint_manager.save(i)
+    criterion = tcc_loss
+    iter_start_time = time.time()
+    try:
+        while not complete:
+            for batch in batch_loaders["train"]:
+                train_loss = train_one_iteration(model, optimizer, criterion, batch, device)
 
-    def attach_data_to_trainer(self, train_data, valid_data):
-        self.training_dataset = train_data
-        self.validation_dataset = valid_data
+                if not global_step % CONFIG.checkpointing_frequency:
+                    checkpoint_manager.save(global_step)
 
-    def attach_prefs_to_trainer(self, train_prefs, valid_prefs):
-        self.training_preferences = train_prefs
-        self.validation_preferences = valid_prefs
+                global_step += 1
+                if global_step > CONFIG.optim.train_max_iters:
+                    complete = True
+                    break
 
-    def initialize_model(self):
-        if self.model_type == "Xprefs":
-            return Resnet18LinearEncoderNet(
-                embedding_size=self.config.irl.embedding_size,
-                num_ctx_frames=1,
-                normalize_embeddings=False,
-                learnable_temp=False,
-            ).to(self.device)
-        elif self.model_type == "RLHF":
-            return Reinf(
-                num_ctx_frames=1,
-                normalize_embeddings=False,
-                learnable_temp=False,
-            ).to(self.device)
-        else:
-            raise Exception(f"Unknown Model type: {self.model_type}")
+                print("Iter[{}/{}] (Epoch {}), {:.6f}s/iter, Loss: {:.3f}".format(
+                global_step,
+                    CONFIG.optim.train_max_iters,
+                    epoch,
+                    time.time() - iter_start_time,
+                    train_loss.item(),
+                ))
+                iter_start_time = time.time()
+            epoch += 1
 
-    def load_device(self):
-        device = (
-            "cuda"
-            if torch.cuda.is_available()
-            else "cpu"
-        )
-        # device = "cpu"
-        return device
+    except KeyboardInterrupt:
+        print("Caught keyboard interrupt. Saving model before quitting.")
 
-    def get_ith_from_preferences(self, preferences, dataset, i):
-        data_row = preferences.iloc[i]
-        o1, o2, e1, e2 = int(data_row["o1_id"]), int(data_row["o2_id"]), data_row["o1_embod"], data_row["o2_embod"]
-        return dataset.get_item(e1, o1), dataset.get_item(e2, o2)
+    finally:
+        checkpoint_manager.save(global_step)
 
-    def _check_for_prefs_and_data(self):
-        assert self.training_dataset is not None
-        assert self.validation_dataset is not None
-        assert self.training_preferences is not None
-        assert self.validation_preferences is not None
+    print("Training terminated.")
+
+if __name__ == "__main__":
+    train_bucket_tcc()

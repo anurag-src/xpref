@@ -26,19 +26,14 @@ def get_config():
     Specify Training Data
     """
     config.data = ml_collections.ConfigDict()
-<<<<<<< HEAD
-    config.data.demonstrations_root = os.path.expanduser("~/Documents/Xpref/trajectories/")
+    config.data.demonstrations_root = os.path.expanduser("~/Documents/Xpref/trajectories2/")
     config.data.preference_type = "combined"  # Can be one of ["cross_embodiment", "same_embodiment", "combined"]
     config.data.truncate_training_preferences = 5000
-=======
-    config.data.demonstrations_root = os.path.expanduser("~/Documents/Xpref/trajectories_num_blocks/")
-    config.data.preference_type = "cross_embodiment"  # Can be one of ["cross_embodiment", "same_embodiment", "combined"]
-    config.data.truncate_training_preferences = 1000
->>>>>>> b76f4dcc11b6344eb802f78eec7b2dfbe1b81e0f
+
     config.data.truncate_validation_loop = 1000
     config.data.truncate_testing_preferences = 1000
     config.data.goal_examples = os.path.expanduser("~/Documents/Xpref/goal_examples")
-    config.data.truncate_goals = 200
+    config.data.truncate_goals = 500
     config.data.train_embodiments = ["longstick","shortstick","gripper"]
     config.data.validation_embodiments = ["longstick","shortstick","gripper"]
     # config.data.train_embodiments = ["longstick", "shortstick", "gripper"]

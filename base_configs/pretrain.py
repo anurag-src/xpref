@@ -53,13 +53,13 @@ def get_config():
   # Absolute path to the dataset root.
 
   # NOTE: Replaced Dataset Directory with the Documents directory, which has file permanence
-  config.data.root = os.path.expanduser("~/Documents/Xpref/trajectories/")
+  config.data.root = os.path.expanduser("~/Documents/Xpref/trajectories_num_blocks/")
   # config.data.root = "/tmp/xirl/datasets/xmagical/"  # Uncomment for original XIRL config
 
   # The mini-batch size. Note this only specifies the number of videos to
   # load frames from in a single batch. The effective batch size is actually
   # larger since we sample multiple frame sequences per video.
-  config.data.batch_size = 4
+  config.data.batch_size = 32
   # Which action classes to select for creating the pretraining dataset. Leave
   # it empty to load all action classes.
   config.data.pretrain_action_class = ()

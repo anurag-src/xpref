@@ -26,7 +26,7 @@ from xirl import models
 from xirl import trainers
 from xirl import transforms
 from xirl import video_samplers
-from xirl.dataset import VideoDataset, GoalExampleDataset
+from xirl.dataset import VideoDataset, GoalExampleDataset, RewardAwareDataset
 from xirl.file_utils import get_subdirs
 from xirl.types import SequenceType
 
@@ -85,6 +85,7 @@ VIDEO_SAMPLERS = {
     "random": video_samplers.RandomBatchSampler,
     "same_class": video_samplers.SameClassBatchSampler,
     "downstream": video_samplers.SameClassBatchSamplerDownstream,
+    "quality_alignment": video_samplers.SameQualityBatchSampler,
 }
 MODELS = {
     "resnet18_linear": models.Resnet18LinearEncoderNet,
@@ -202,7 +203,7 @@ def frame_sampler_from_config(config, downstream):
     return FRAME_SAMPLERS[config.frame_sampler.strategy](**kwargs)
 
 
-def video_sampler_from_config(config, dir_tree, downstream, sequential):
+def video_sampler_from_config(config, dir_tree, downstream, sequential, rewards=None):
     """Create a video sampler from a config."""
     kwargs = {
         "dir_tree": dir_tree,
@@ -212,10 +213,13 @@ def video_sampler_from_config(config, dir_tree, downstream, sequential):
     if downstream:
         kwargs.pop("batch_size")
         return VIDEO_SAMPLERS["downstream"](**kwargs)
+    if rewards:
+        kwargs["rewards"] = rewards
+        return VIDEO_SAMPLERS["quality_alignment"](**kwargs)
     return VIDEO_SAMPLERS[config.data.pretraining_video_sampler](**kwargs)
 
 
-def dataset_from_config(config, downstream, split, debug):
+def dataset_from_config(config, downstream, split, debug, with_reward=False):
     """Create a video dataset from a config."""
     dataset_path = osp.join(config.data.root, split)
 
@@ -263,6 +267,7 @@ def dataset_from_config(config, downstream, split, debug):
 
     # We need to separate out the dataclasses for each action class when
     # creating downstream datasets.
+    print(f"Creating dataset with parameter with_reward={with_reward}")
     if downstream:
         dataset = {}
         for action_class in action_classes:
@@ -276,6 +281,17 @@ def dataset_from_config(config, downstream, split, debug):
             )
             single_class_dataset.restrict_subdirs(action_class)
             dataset[action_class] = single_class_dataset
+    elif with_reward:
+        frame_sampler = frame_sampler_from_config(config, downstream=False)
+        dataset = RewardAwareDataset(
+            dataset_path,
+            frame_sampler,
+            seed=config.seed,
+            augmentor=augmentor,
+            max_vids_per_class=config.data.max_vids_per_class,
+        )
+        dataset.restrict_subdirs(action_classes)
+
     else:
         frame_sampler = frame_sampler_from_config(config, downstream=False)
         dataset = VideoDataset(

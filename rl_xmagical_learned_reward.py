@@ -44,7 +44,7 @@ def main(_):
     else:
       reward_type = "distance_to_goal"
 
-    reward_type = "reward_prediction_from_prefs"
+    # reward_type = "reward_prediction_from_prefs"
 
     # Map the embodiment to the x-MAGICAL env name.
     env_name = XMAGICAL_EMBODIMENT_TO_ENV_NAME[kwargs["embodiment"]]

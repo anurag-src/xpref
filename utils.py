@@ -236,6 +236,17 @@ def wrap_learned_reward(env, config):
         }
         env = wrappers.InferredFromEmbeddingReward(**kwargs)
 
+    elif config.reward_wrapper.type == "RLHF":
+        kwargs = {
+            "env": env,
+            "expiriment_dir": pretrained_path,
+            "device": device,
+            "res_hw": load_config_from_dir(pretrained_path).data_augmentation.image_size,
+            # TODO: Fix the fact that we need a dummy model here
+            "model": torch.nn.Linear(32, 1),  # This is just a dummy network to interface with XIRL
+        }
+        env = wrappers.RLHFInferredReward(**kwargs)
+
     else:
         raise ValueError(
             f"{config.reward_wrapper.type} is not a valid reward wrapper.")
@@ -290,6 +301,12 @@ def make_buffer(
         # TODO: Fix the fact that we need a dummy model here
         kwargs["model"] = torch.nn.Linear(32, 1)  # This is just a dummy network to interface with XIRL
         buffer = replay_buffer.ReplayBufferLearnedReward(**kwargs)
+
+    elif config.reward_wrapper.type == "RLHF":
+        kwargs["expiriment_dir"] = pretrained_path
+        # TODO: Fix the fact that we need a dummy model here
+        kwargs["model"] = torch.nn.Linear(32, 1)  # This is just a dummy network to interface with XIRL
+        buffer = replay_buffer.ReplayBufferRewardLearningHumanFeedback(**kwargs)
 
     else:
         raise ValueError(

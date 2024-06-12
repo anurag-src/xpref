@@ -86,6 +86,7 @@ VIDEO_SAMPLERS = {
     "same_class": video_samplers.SameClassBatchSampler,
     "downstream": video_samplers.SameClassBatchSamplerDownstream,
     "quality_alignment": video_samplers.SameQualityBatchSampler,
+    "triplet_sampler": video_samplers.TripletBatchSampler,
 }
 MODELS = {
     "resnet18_linear": models.Resnet18LinearEncoderNet,
@@ -98,6 +99,7 @@ TRAINERS = {
     "lifs": trainers.LIFSTrainer,
     "tcn": trainers.TCNTrainer,
     "goal_classifier": trainers.GoalFrameClassifierTrainer,
+    "triplets": trainers.TripletTrainer,
 }
 EVALUATORS = {
     "kendalls_tau": evaluators.KendallsTau,
@@ -215,7 +217,11 @@ def video_sampler_from_config(config, dir_tree, downstream, sequential, rewards=
         return VIDEO_SAMPLERS["downstream"](**kwargs)
     if rewards:
         kwargs["rewards"] = rewards
+        if config.algorithm == "triplets":
+            return VIDEO_SAMPLERS["triplet_sampler"](**kwargs)
+        kwargs["num_buckets"] = config.data.num_buckets
         return VIDEO_SAMPLERS["quality_alignment"](**kwargs)
+
     return VIDEO_SAMPLERS[config.data.pretraining_video_sampler](**kwargs)
 
 

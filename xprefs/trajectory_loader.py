@@ -31,6 +31,8 @@ class TrajectoryLoader:
             for folder in folders:
                 self.trajectories[embodiment_type][int(folder)] = os.path.join(root_dir, embodiment_type, folder)
 
+        print("Trajectories loaded for embodiments: ", self.trajectories.keys())
+
     @staticmethod
     def full_dataset_from_config(config, train=True, debug=False):
         """Create a video dataset from an xprefs config."""

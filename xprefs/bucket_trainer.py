@@ -13,7 +13,7 @@ import time
 import torch
 import yaml
 
-from configs.xmagical.pretraining.tcc import get_config
+from configs.xmagical.pretraining.tcc_buckets import get_config
 from xirl import factory
 from torchkit import CheckpointManager
 from xirl.losses import compute_tcc_loss
@@ -36,7 +36,7 @@ def load_device():
     return device
 
 def load_dataset(split_type="train", debug=False):
-    use_buckets = split_type == "train"
+    use_buckets = (split_type == "train")
     dataset = factory.dataset_from_config(CONFIG, False, split_type, debug, with_reward=use_buckets)
     print("type: ", type(dataset))
     if use_buckets:

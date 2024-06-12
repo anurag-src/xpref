@@ -16,7 +16,7 @@
 """Launch script for pre-training representations."""
 
 import os.path as osp
-
+import time
 from absl import app
 from absl import flags
 from absl import logging
@@ -34,7 +34,7 @@ from xirl import common
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_string("experiment_name", None, "Experiment name.")
+flags.DEFINE_string("experiment_name", str(time.time()), "Experiment name.")
 flags.DEFINE_boolean("resume", False, "Whether to resume training.")
 flags.DEFINE_string("device", "cuda:0", "The compute device.")
 flags.DEFINE_boolean("raw_imagenet", False, "")
@@ -168,5 +168,5 @@ def main(_):
 
 
 if __name__ == "__main__":
-  flags.mark_flag_as_required("experiment_name")
+  # flags.mark_flag_as_required("experiment_name")
   app.run(main)

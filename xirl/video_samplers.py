@@ -147,18 +147,86 @@ class SameClassBatchSamplerDownstream(SameClassBatchSampler):
 
 
 class SameQualityBatchSampler(VideoBatchSampler):
-    def __init__(self, dir_tree, batch_size, rewards, sequential=False):
+    def __init__(self, dir_tree, batch_size, rewards, num_buckets=4, sequential=False):
         super().__init__(dir_tree, batch_size, sequential)
+
+        """
+        Assumes an iterable "rewards" of (reward, embodiment, video_index) triples, sorted by increasing reward
+        """
+
         self.rewards = rewards
+        self.n_buckets = num_buckets
+        print("Length of Reward Sequence: ", len(self.rewards))
 
     def _generate_indices(self):
         idxs = []
+        r_batches = []
+
         end = self._batch_size * (len(self.rewards) // self._batch_size)
-        for i in range(0, end, self._batch_size):
-            batch = []
-            for j in range(self._batch_size):
-                r, e, idx = self.rewards[i + j]
-                batch.append((e, idx))
-            idxs.append(batch)
-        print("NEW VID SAMPLER INDICES: ", idxs[:10])
+        elements_per_bucket = len(self.rewards) // self.n_buckets
+        batches_per_bucket = elements_per_bucket // self._batch_size
+        for i in range(0, end, elements_per_bucket):
+            max_batch = []
+            # Create the largest possible batch size
+            for j in range(elements_per_bucket):
+                max_batch.append(self.rewards[i + j])
+
+            # Sample from the bucket to create a batch of size _batch_size
+            for b in range(batches_per_bucket):
+                rew_batch = []
+                batch = []
+
+                idx = np.random.randint(0, len(max_batch), self._batch_size)
+                for i in idx:
+                    r, e, ind = max_batch[i]
+                    batch.append((e, ind))
+                    rew_batch.append(r)
+
+                idxs.append(batch)
+                r_batches.append(rew_batch)
+        print("NEW VID SAMPLER INDICES: ", r_batches[-2:])
         return idxs
+
+
+class TripletBatchSampler(VideoBatchSampler):
+    def __init__(self, dir_tree, batch_size, rewards, sequential=False):
+        super().__init__(dir_tree, batch_size, sequential)
+
+        """
+        Assumes an iterable "rewards" of (reward, embodiment, video_index) triples, sorted by increasing reward
+        """
+
+        self.rewards = rewards
+        print("Length of Reward Sequence: ", len(self.rewards))
+
+    def _generate_indices(self):
+        """
+        Outputs Batch of size (3B) x 3, where every row is the triplet (reward, embodiment, video_index)
+        Every 3 rows are ordered in terms of decreasing reward. A > B > C
+        """
+        batches = []
+        end = self._batch_size * (len(self.rewards) // self._batch_size)
+
+        for i in range(0, end, self._batch_size):
+            idxs = []
+            rand_selection = np.random.randint(0, len(self.rewards), (self._batch_size, 3))
+            for i, j, k in rand_selection:
+                # Prevent duplicate trajectories in triplet
+                if i == j: j -= 1
+                if i == k: k -= 1
+                if j == k: k -= 1
+                assert i != j and i != k and j != k
+
+                # Append the ith, jth, and kth rewards to the row starting with the highest reward and decreasing to the lowest reward.
+                # This is some novice looking code right here but it works :)
+                l = [i, j, k]
+                l.sort()
+                A, B, C = self.rewards[l[0]],  self.rewards[l[1]], self.rewards[l[2]]
+                row = [
+                    (A[1], A[2]),
+                    (B[1], B[2]),
+                    (C[1], C[2])
+                ]
+                idxs += row
+            batches.append(idxs)
+        return batches

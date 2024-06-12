@@ -19,10 +19,12 @@ import matplotlib.pyplot as plt
 from ml_collections import config_dict
 from xprefs.calculate_kappa import calculate_normalization_denominator
 import random
+
 seed = 0
 np.random.seed(seed)
 torch.manual_seed(seed)
 random.seed(seed)
+
 ConfigDict = config_dict.ConfigDict
 XPREFS_CONFIG = get_xprefs_config()
 
@@ -82,7 +84,11 @@ def train_xprefs():
     print(f"Begin Training Loop with {len(training_preferences)} preferences ({len(validation_preferences)} validation prefs)!")
 
     # Main Training Loop
-    eval_goal = trainer.calculate_goal_embedding(goal_examples_data)
+    if XPREFS_CONFIG.irl.goal_is_origin:
+        print("We are using the zero goal!")
+        eval_goal = torch.tensor([0.0 for _ in range(XPREFS_CONFIG.irl.embedding_size)], device="cuda")
+    else:
+        eval_goal = trainer.calculate_goal_embedding(goal_examples_data)
     try:
         while not complete:
             for batch_i in range(0, len(training_preferences), XPREFS_CONFIG.irl.batch_size):

@@ -206,6 +206,10 @@ class Resnet18RawImageNetFeaturesNet(SelfSupervisedModel):
     self.encoder = nn.Identity()
 
 
+"""
+A model designed specifically for the intake of triplet batches
+"""
+
 class Upsampling(nn.Module):
   """Unet upsampling adapted from [1].
 

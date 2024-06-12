@@ -149,6 +149,7 @@ class XPrefsRewardTrainer:
 
     def initialize_model(self):
         if self.model_type == "Xprefs":
+            print("Using Emb Size: ", self.config.irl.embedding_size)
             return Resnet18LinearEncoderNet(
                 embedding_size=self.config.irl.embedding_size,
                 num_ctx_frames=1,

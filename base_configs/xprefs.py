@@ -26,14 +26,15 @@ def get_config():
     Specify Training Data
     """
     config.data = ml_collections.ConfigDict()
-    config.data.demonstrations_root = os.path.expanduser("~/Documents/Xpref/trajectories2/")
-    config.data.preference_type = "combined"  # Can be one of ["cross_embodiment", "same_embodiment", "combined"]
+    config.data.demonstrations_root = os.path.expanduser("~/Documents/Xpref/trajectories_num_blocks/")
+    config.data.preference_type = "cross_embodiment"  # Can be one of ["cross_embodiment", "same_embodiment", "combined"]
     config.data.truncate_training_preferences = 5000
 
     config.data.truncate_validation_loop = 1000
     config.data.truncate_testing_preferences = 1000
     config.data.goal_examples = os.path.expanduser("~/Documents/Xpref/goal_examples")
-    config.data.truncate_goals = 500
+    config.data.truncate_goals = 200
+    config.data.batch_size = 32
     config.data.train_embodiments = ["longstick","shortstick","gripper"]
     config.data.validation_embodiments = ["longstick","shortstick","gripper"]
     # config.data.train_embodiments = ["longstick", "shortstick", "gripper"]
@@ -59,10 +60,10 @@ def get_config():
     config.data_augmentation.image_size = (112, 112)
     config.data_augmentation.train_transforms = [
         "global_resize",
-        "random_resized_crop",
-        "color_jitter",
-        "grayscale",
-        "gaussian_blur",
+        # "random_resized_crop",
+        # "color_jitter",
+        # "grayscale",
+        # "gaussian_blur",
         # "normalize",
     ]
     config.data_augmentation.eval_transforms = [
@@ -74,9 +75,11 @@ def get_config():
     Define IRL Parameters
     """
     config.irl = ml_collections.ConfigDict()
-    config.irl.learning_type = "RLHF"  # Can be ["Xprefs", "RLHF"]
+    config.irl.learning_type = "Xprefs"  # Can be ["Xprefs", "RLHF"]
     config.irl.recompute_goal_every = None
+    config.irl.goal_is_origin = True
     config.irl.train_max_iters = 4000
+    # config.irl.train_max_iters = 100
     config.irl.eval_every = 100
     config.irl.batch_size = 10
     config.irl.embedding_size = 32

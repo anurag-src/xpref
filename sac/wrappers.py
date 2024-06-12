@@ -29,7 +29,7 @@ import torch
 
 import utils
 from xirl import factory
-from xirl.models import SelfSupervisedModel, Resnet18LinearEncoderNet
+from xirl.models import SelfSupervisedModel, Resnet18LinearEncoderNet, ReinforcementLearningHumanFeedback
 from torchkit import CheckpointManager
 
 import cv2
@@ -393,3 +393,51 @@ class InferredFromEmbeddingReward(LearnedVisualReward):
         goal_file = os.path.join(exp_dir, "goal_embedding.csv")
         goal = np.loadtxt(goal_file, delimiter=',')
         return torch.tensor(goal).cpu().numpy()
+
+
+class RLHFInferredReward(LearnedVisualReward):
+    def __init__(
+            self,
+            expiriment_dir,
+            **base_kwargs,
+    ):
+        """Constructor.
+
+    Args:
+      reward_network: A path to a pretrained reward network of type PreferenceRewardPredictor.
+      goal_examples_path: A path to a folder containing goal examples
+      embedding_size: The size of the embedding model
+      **base_kwargs: Base keyword arguments.
+    """
+        super().__init__(**base_kwargs)
+
+        self.reward_predictor = ReinforcementLearningHumanFeedback(
+            num_ctx_frames=1,
+            normalize_embeddings=False,
+            learnable_temp=False,
+        ).to("cuda")
+        # self.reward_predictor.eval()
+
+        try:
+            self.kappa = utils.extract_kappa_from_exp(expiriment_dir)
+        except Exception as e:
+            self.kappa = 1.0
+            warnings.warn(f"A Normalization constant could not be extracted for the experiment. See exception: {e}")
+
+        checkpoint_dir = os.path.join(expiriment_dir, "checkpoints")
+        checkpoint_manager = CheckpointManager(
+            checkpoint_dir,
+            model=self.reward_predictor,
+        )
+        i = checkpoint_manager.restore_or_initialize()
+
+        if i == 0:
+            raise Exception(
+                f"Expected folder {expiriment_dir} to contain a valid checkpoint for model, but checkpoint file could not be loaded")
+
+    def _get_reward_from_image(self, image):
+        """Forward the pixels through the model and compute the reward."""
+        image_tensor = self._to_tensor(image)
+        embs = self.reward_predictor.infer(image_tensor).numpy().embs
+        return embs[0][0]
+

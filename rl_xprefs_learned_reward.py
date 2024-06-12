@@ -77,7 +77,7 @@ def main(_):
                 "--device",
                 f"{FLAGS.device}",
                 "--resume",
-                f"{FLAGS.device}",
+                f"{FLAGS.resume}",
             ]))
 
     # Wait for each seed to terminate.

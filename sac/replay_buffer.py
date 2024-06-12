@@ -223,7 +223,7 @@ class ReplayBufferGoalClassifier(ReplayBufferLearnedReward):
         image_tensors = [self._pixel_to_tensor(i) for i in self.pixels_staging]
         image_tensors = torch.cat(image_tensors, dim=1)
         prob = torch.sigmoid(self.model.infer(image_tensors).embs)
-        return prob.item()
+        return prob.tolist()
 
 
 class ReplayBufferLearnedReward(ReplayBufferLearnedReward):
@@ -274,3 +274,38 @@ class ReplayBufferLearnedReward(ReplayBufferLearnedReward):
         goal_file = os.path.join(exp_dir, "goal_embedding.csv")
         goal = np.loadtxt(goal_file, delimiter=',')
         return torch.tensor(goal).cpu().numpy()
+
+class ReplayBufferRewardLearningHumanFeedback(ReplayBufferLearnedReward):
+    """Replace the environment reward with distances in embedding space."""
+
+    def __init__(
+            self,
+            expiriment_dir,
+            **base_kwargs,
+    ):
+        super().__init__(**base_kwargs)
+
+        self.reward_predictor = Resnet18LinearEncoderNet(
+            num_ctx_frames=1,
+            normalize_embeddings=False,
+            learnable_temp=False,
+        ).to(base_kwargs["device"])
+        # self.reward_predictor.eval()
+
+        checkpoint_dir = os.path.join(expiriment_dir, "checkpoints")
+        checkpoint_manager = CheckpointManager(
+            checkpoint_dir,
+            model=self.reward_predictor,
+        )
+        i = checkpoint_manager.restore_or_initialize()
+
+        if i == 0:
+            raise Exception(
+                f"Expected folder {expiriment_dir} to contain a valid checkpoint for model, but checkpoint file could not be loaded")
+
+    def _get_reward_from_image(self):
+        """Forward the pixels through the model and compute the reward."""
+        image_tensors = [self._pixel_to_tensor(i) for i in self.pixels_staging]
+        image_tensors = torch.cat(image_tensors, dim=1)
+        embs = self.reward_predictor.infer(image_tensors).numpy().embs
+        return embs

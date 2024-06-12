@@ -83,7 +83,7 @@ def embed_withheld_goals(
             emb = out.embs.numpy()
             goal_embs.append(emb)
     goal_emb = np.mean(np.stack(goal_embs, axis=0), axis=0, keepdims=True)
-    return goal_emb, None
+    return goal_emb, 1.0
 
 
 def load_withheld_goal_frames(config, split_type="Train", debug=False):
@@ -126,10 +126,12 @@ def main(_):
     model.to(device).eval()
 
     if FLAGS.withheld_goals:
-        goal_emb, _ = embed_withheld_goals(model, downstream_loader, device)
+        # Distance Scale is 1.0 by default in this case
+        goal_emb, distance_scale = embed_withheld_goals(model, downstream_loader, device)
     else:
         goal_emb, distance_scale = embed(model, downstream_loader, device)
-        utils.save_pickle(FLAGS.experiment_path, distance_scale, "distance_scale.pkl")
+
+    utils.save_pickle(FLAGS.experiment_path, distance_scale, "distance_scale.pkl")
     utils.save_pickle(FLAGS.experiment_path, goal_emb, "goal_emb.pkl")
 
 if __name__ == "__main__":

@@ -44,6 +44,7 @@ def main(_):
     env = utils.make_env(env_name, seed=3)
 
     # ACTIONS_FOLDER = "/home/connor/Documents/Xpref/trajectories_num_blocks/valid/mediumstick/25/actions.json"
+    # ACTIONS_FOLDER = "/home/connor/Documents/Xpref/trajectories_num_blocks/valid/mediumstick/932/actions.json"
     ACTIONS_FOLDER = "/home/connor/Documents/Xpref/trajectories_num_blocks/valid/mediumstick/1763/actions.json"
     with open(ACTIONS_FOLDER, "r") as f:
         actions = json.load(f)

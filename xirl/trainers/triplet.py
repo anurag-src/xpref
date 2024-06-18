@@ -45,21 +45,21 @@ class TripletTrainer(Trainer):
     distAC = (embs[:, 0] - embs[:, 2]).pow(2).sum(-1).sqrt()
     # The resulting tensor should be (N x 2 x num_cc_frames)
 
-    # Sum over the number of frames in the trajectory
-    sumDistAB = distAB.sum(-1)
-    sumDistAC = distAC.sum(-1)
-    # The resulting tensor should be (N x 2)
+    # Sum over the number of frames in the trajectory. Negate.
+    sumDistAB = -distAB.sum(-1).unsqueeze(1)
+    sumDistAC = -distAC.sum(-1).unsqueeze(1)
 
     # Stack the Distances
     logits = torch.hstack((sumDistAB, sumDistAC))
-    print(logits.shape)
+    # The resulting tensors should be (N x 2)
 
     # Create the labels tensor.
-    row_tensor = torch.FloatTensor([1, 0])  # Always prefer d(embs[A], embs[B]) to d(embs[A], embs[C]). Data is structured this way.
-    label_tensor = row_tensor.unsqueeze(0).repeat(batch_size, 1)
-    label_tensor = label_tensor.to(self._device)
+    label_tensor = torch.zeros(logits.shape[0], dtype=torch.long, device=self._device)  # Index CE Loss -- Always prefer d(embs[A], embs[B]) to d(embs[A], embs[C]). Data is structured this way.
 
-    return F.binary_cross_entropy_with_logits(
-        logits.view(batch_size * 2),
-        label_tensor.view(batch_size * 2),
+    # Here, the size of inputs to CE loss needs to be the exact same.
+    assert logits.shape[0] == label_tensor.shape[0]
+
+    return F.cross_entropy(
+        logits,
+        label_tensor
     )

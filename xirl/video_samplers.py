@@ -215,12 +215,11 @@ class TripletBatchSampler(VideoBatchSampler):
                 if i == j: j -= 1
                 if i == k: k -= 1
                 if j == k: k -= 1
-                assert i != j and i != k and j != k
 
                 # Append the ith, jth, and kth rewards to the row starting with the highest reward and decreasing to the lowest reward.
-                # This is some novice looking code right here but it works :)
                 l = [i, j, k]
                 l.sort()
+                l = list(reversed(l))
                 A, B, C = self.rewards[l[0]],  self.rewards[l[1]], self.rewards[l[2]]
                 row = [
                     (A[1], A[2]),

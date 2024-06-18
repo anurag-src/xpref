@@ -23,10 +23,10 @@ def get_config():
 
   config = _get_config()
 
+  print("USING TRIPLET CONFIG")
   config.algorithm = "triplets"
-  config.optim.train_max_iters = 4_000
-  config.data.batch_size = 24
-  config.data.num_buckets = 4
+  config.optim.train_max_iters = 5_000
+  config.data.batch_size = 32
   config.frame_sampler.strategy = "uniform"
   config.frame_sampler.uniform_sampler.offset = 0
   config.frame_sampler.num_frames_per_sequence = 40
@@ -34,6 +34,20 @@ def get_config():
   config.model.embedding_size = 32
   config.model.normalize_embeddings = False
   config.model.learnable_temp = False
+
+  config.data_augmentation.train_transforms = [
+    "global_resize",
+    "random_resized_crop",
+    # "color_jitter",
+    # "grayscale",
+    # "gaussian_blur",
+    # "normalize",
+  ]
+  config.data_augmentation.eval_transforms = [
+    "global_resize",
+    # "normalize",
+  ]
+
   # config.loss.tcc.stochastic_matching = False
   # config.loss.tcc.loss_type = "regression_mse"
   # config.loss.tcc.similarity_type = "l2"

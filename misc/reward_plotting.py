@@ -12,6 +12,7 @@ methods = [
     ("xprefs_reward.txt", "XPrefs"),
     ("xprefs_0G.txt", "XPrefs (g=0)"),
     ("goal_classifier.txt", "Goal Classifier"),
+    ("triplets.txt", "Triplet Repr. (Tian et al.)"),
     # ("4_buckets.txt", "Buckets-4"),
 ]
 
@@ -20,7 +21,7 @@ def load_data(method):
     return arr
 
 if __name__ == "__main__":
-    fig, ax = plt.subplots(8, 1, figsize=(8, 8), sharex=True)
+    fig, ax = plt.subplots(9, 1, figsize=(8, 8), sharex=True)
     for i in range(len(methods)):
         m = methods[i][0]
         n = methods[i][1]
@@ -44,6 +45,8 @@ if __name__ == "__main__":
             ax[i].set_ylim(bottom=-0.25, top=-0.12)
         if i == 7:
             ax[i].set_ylim(bottom=-0.05, top=1.1)
+        if i == 8:
+            ax[i].set_ylim(bottom=-27, top=-11)
         # ax.fill_between(x, y + err, y - err, alpha=0.15)
 
     # plt.ylabel("Training Loss")

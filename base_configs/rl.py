@@ -56,8 +56,8 @@ def get_config():
 
   # Can be one of ['distance_to_goal', 'goal_classifier', 'reward_prediction_from_prefs', None].
   # config.reward_wrapper.type = "reward_prediction_from_prefs"
-  config.reward_wrapper.type = "goal_classifier"
-  # config.reward_wrapper.type = "distance_to_goal"
+  # config.reward_wrapper.type = "goal_classifier"
+  config.reward_wrapper.type = "distance_to_goal"
   # config.reward_wrapper.type = "RLHF"
   # config.reward_wrapper.type = None
 
@@ -68,8 +68,10 @@ def get_config():
   # config.reward_wrapper.pretrained_path = os.path.expanduser("/home/connor/Documents/Xpref/learned_reward_models/rlhf_mediumstick_cross_5k")
   # config.reward_wrapper.pretrained_path = os.path.expanduser("/home/connor/Documents/Xpref/learned_reward_models/tcc_buckets")
   # config.reward_wrapper.pretrained_path = os.path.expanduser("/home/connor/Documents/Xpref/experiments/xprefs_w_zero_goal_e_FINAL")
-  config.reward_wrapper.pretrained_path = os.path.expanduser("/home/connor/Documents/Xpref/pretrain_runs/GoalClassifier")
+  # config.reward_wrapper.pretrained_path = os.path.expanduser("/home/connor/Documents/Xpref/pretrain_runs/GoalClassifier")
+  # config.reward_wrapper.pretrained_path = os.path.expanduser("/home/connor/Documents/Xpref/pretrain_runs/TripletLearning2")
   # config.reward_wrapper.pretrained_path = os.path.expanduser("/home/connor/Documents/Xpref/experiments/4_buckets_mqme")
+  config.reward_wrapper.pretrained_path = os.path.expanduser("/home/connor/Documents/Xpref/pretrain_runs/Triplets_Final")
   # config.reward_wrapper.pretrained_path = os.path.expanduser("~/Documents/Xpref/pretrain_runs/tcc_mediumstick/")
 
 

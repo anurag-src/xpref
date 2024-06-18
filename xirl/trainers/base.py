@@ -105,7 +105,6 @@ class Trainer(abc.ABC):
 
     # Forward pass to compute embeddings.
     frames = batch["frames"].to(self._device)
-    print("Frames: ", frames.shape)
     out = self._model(frames)
 
     # Compute losses.

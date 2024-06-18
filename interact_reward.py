@@ -42,7 +42,7 @@ config_flags.DEFINE_config_file(
 
 def main(_):
     env_name = XMAGICAL_EMBODIMENT_TO_ENV_NAME[FLAGS.embodiment]
-    env = utils.make_env(env_name, seed=0)
+    env = utils.make_env(env_name, seed=3)
 
     # Reward learning wrapper.
     if FLAGS.config.reward_wrapper.type is not None:

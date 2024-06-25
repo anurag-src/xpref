@@ -52,6 +52,7 @@ def main(_):
   # base config.
   validate_config(FLAGS.config, mode="pretrain")
 
+
   config = FLAGS.config
   exp_dir = osp.join(config.root_dir, FLAGS.experiment_name)
   setup_experiment(exp_dir, config, FLAGS.resume)
@@ -88,6 +89,11 @@ def main(_):
       trainer,
       eval_manager,
   ) = common.get_factories(config, device)
+
+  # Log the Model Parameter Info
+  num_params = sum(p.numel() for p in model.parameters())  # Total parameters
+  num_trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)  # Trainable parameters
+  logging.info(f"Model Total Params: {num_params}, Trainable Params: {num_trainable_params}")
 
   # Create checkpoint manager.
   checkpoint_dir = osp.join(exp_dir, "checkpoints")

@@ -29,6 +29,9 @@ class TripletTrainer(Trainer):
   A trainer that learns to represent rewards with the bradley-terry model via triplet embeddings
   """
 
+  def tensor_contains_nan(self, tensor):
+    return torch.isnan(tensor).any()
+
   def compute_loss(
       self,
       embs,
@@ -54,7 +57,8 @@ class TripletTrainer(Trainer):
     # The resulting tensors should be (N x 2)
 
     # Create the labels tensor.
-    label_tensor = torch.zeros(logits.shape[0], dtype=torch.long, device=self._device)  # Index CE Loss -- Always prefer d(embs[A], embs[B]) to d(embs[A], embs[C]). Data is structured this way.
+    # Index CE Loss -- Always prefer d(embs[A], embs[B]) to d(embs[A], embs[C]). Data is structured this way.
+    label_tensor = torch.zeros(logits.shape[0], dtype=torch.long, device=self._device)
 
     # Here, the size of inputs to CE loss needs to be the exact same.
     assert logits.shape[0] == label_tensor.shape[0]

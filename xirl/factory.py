@@ -20,6 +20,7 @@ import os.path as osp
 
 import albumentations as alb
 import torch
+import numpy as np
 from xirl import evaluators
 from xirl import frame_samplers
 from xirl import models
@@ -67,8 +68,8 @@ TRANSFORMS = {
     "normalize":
         functools.partial(
             alb.Normalize,
-            mean=transforms.PretrainedMeans.IMAGENET,
-            std=transforms.PretrainedStds.IMAGENET,
+            # mean=np.array(transforms.PretrainedMeans.IMAGENET),
+            # std=np.array(transforms.PretrainedStds.IMAGENET),
             p=1.0,
         ),
 }
@@ -93,6 +94,7 @@ MODELS = {
     "resnet18_classifier": models.GoalClassifier,
     "resnet18_features": models.Resnet18RawImageNetFeaturesNet,
     "resnet18_linear_ae": models.Resnet18LinearEncoderAutoEncoderNet,
+    "resnet18_frozen": models.Resnet18FrozenBackbone,
 }
 TRAINERS = {
     "tcc": trainers.TCCTrainer,
@@ -154,6 +156,8 @@ def model_from_config(config):
     if config.model.model_type == "resnet18_linear":
         kwargs["embedding_size"] = config.model.embedding_size
     elif config.model.model_type == "resnet18_linear_ae":
+        kwargs["embedding_size"] = config.model.embedding_size
+    elif config.model.model_type == "resnet18_frozen":
         kwargs["embedding_size"] = config.model.embedding_size
     return MODELS[config.model.model_type](**kwargs)
 

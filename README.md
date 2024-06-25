@@ -1,62 +1,30 @@
-# XIRL
+# Representation Alignment from Human Feedback for Cross-Embodiment Reward Learning from Mixed-Quality Demonstrations
+**Connor Mattson, Anurag Aribandi, and Daniel S. Brown**
+
 
 [![python](https://img.shields.io/badge/python-3.8-blue.svg)](https://www.python.org/downloads/release/python-383/)
-[![arXiv](https://img.shields.io/badge/arXiv-2106.03911-b31b1b.svg)](https://arxiv.org/abs/2106.03911)
-[![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](https://github.com/google-research/google-research/blob/master/LICENSE)
-
-- [Overview](#overview)
-- [Setup](#setup)
-- [Datasets](#datasets)
-- [Code Navigation](#code-navigation)
-- [Experiments: Reproducing Paper Results](#experiments-reproducing-paper-results)
-- [Extending XIRL](#extending-xirl)
-- [Acknowledgments](#acknowledgments)
-
-<p align="center">
-  <img src="./images/teaser.gif" width="75%"/>
-</p>
 
 ## Overview
 
-Code release for our CoRL 2021 conference paper:
+We seek to learn reward functions from demonstrations given by multiple different robot models (mixed-embodiment) and with varying task success (mixed-quality), denoted "MQME" data. Our work explores several options for reward learning including preference learning, triplet learning, and TCC augmentation. Please refer to [our paper](https://sites.google.com/view/cross-irl-mqme/home) for more details. 
 
-<table><tr><td>
-    <strong>
-        <a href="https://x-irl.github.io/">
-            XIRL: Cross-embodiment Inverse Reinforcement Learning
-        </a><br/>
-    </strong>
-    Kevin Zakka<sup>1,3</sup>, Andy Zeng<sup>1</sup>, Pete Florence<sup>1</sup>, Jonathan Tompson<sup>1</sup>, Jeannette Bohg<sup>2</sup>, and Debidatta Dwibedi<sup>1</sup><br/>
-    Conference on Robot Learning (CoRL) 2021
-</td></tr></table>
+This repository serves as a foundation for exploring and extending our models, as well as reproducing the results of the paper.
 
-<sup>1</sup><em>Robotics at Google,</em>
-<sup>2</sup><em>Stanford University,</em>
-<sup>3</sup><em>UC Berkeley</em>
+This codebase is heavily authored by and reliant on the work published by [Zakka et al. "XIRL: Cross-embodiment Inverse Reinforcement Learning"](https://x-irl.github.io/). Their published code served as the foundation for this project. [Here is the original repository we forked from](https://github.com/google-research/google-research/tree/master/xirl).
 
----
-
-This repository serves as a general-purpose library for (a) **self-supervised pretraining** on video data and **(b)** downstream **reinforcement learning** using the learned representations as reward functions. It also contains models, training scripts and config files for reproducing our results and as a reference for implementation details.
-
-Our hope is that the code's modularity allows you to easily extend and build on top of our work. To aid in this effort, we're releasing two additional standalone libraries:
-
-* [x-magical](https://github.com/kevinzakka/x-magical): our Gym-like benchmark extension of MAGICAL geared towards cross-embodiment imitation.
-* [torchkit](https://github.com/kevinzakka/torchkit): a lightweight library containing useful PyTorch boilerplate utilities like logging and model checkpointing.
-
-For the latest updates, see: [x-irl.github.io](https://x-irl.github.io)
+For the latest updates, videos, and the open-access paper, [visit our project website](https://sites.google.com/view/cross-irl-mqme/home).
 
 ## Setup
 
 We use Python 3.8 and [Miniconda](https://docs.conda.io/en/latest/miniconda.html) for development. To create an environment and install dependencies, run the following steps:
 
 ```bash
-# Clone and cd into xirl.
-git clone git@github.com:google-research/google-research.git --depth=1
-cd google-research/xirl
+# Clone and cd into xprefs.
+git clone git@github.com:anurag-src/xpref.git
 
 # Create and activate environment.
-conda create -n xirl python=3.8
-conda activate xirl
+conda create -n xpref python=3.8
+conda activate xpref
 
 # Install dependencies.
 pip install -r requirements.txt
@@ -64,9 +32,17 @@ pip install -r requirements.txt
 
 ## Datasets
 
-**X-MAGICAL**
+**MQME Dataset**
 
-Run the following bash script to download the demonstration dataset for the X-MAGICAL benchmark:
+You can download and unzip the demonstration dataset used in our work from [this Google Drive link](https://drive.google.com/file/d/1xvUv3LlrBzVJDhE3zk3W_e8mK9lv5ckU/view?usp=sharing).
+
+**Goal Examples Dataset**
+
+See [this Google Drive Link](https://drive.google.com/file/d/16m0FKz8SR6kMcZKy1oABEFe0HlPnjAOp/view?usp=sharing).
+
+**X-MAGICAL (Optional, for baselines)**
+
+Run the following bash script to download the demonstration dataset for the [X-MAGICAL benchmark](https://github.com/kevinzakka/x-magical):
 
 ```bash
 bash scripts/download_xmagical_dataset.sh
@@ -74,72 +50,69 @@ bash scripts/download_xmagical_dataset.sh
 
 The dataset will be located in `/tmp/xirl/datasets/xmagical`. You are free to modify the save destination, just make sure you update `config.data.root` in the pretraining config file &mdash; see `base_configs/pretrain.py`.
 
-**X-REAL**
+**Set your dataset directory**
 
-Our real-world dataset X-REAL will be released as soon as it gets approval, stay tuned!
+In [base_configs/pretrain.py](base_configs/pretrain.py), update the value of "config.data.root" to match the file path where your dataset is. For the XMagical dataset, we recommend moving the data from the default tmp installation directory if you plan to benchmark or build upon our work and XIRL.
+
+## Experiments
+
+For all experiments, configure the "config.root_dir" variable in [base_configs/pretrain.py](base_configs/pretrain.py) to an experiment output directory (rollout videos, saved models, tensorboard logs, etc.)
+
+### Reward Learning (7 Methods)
+#### XIRL (Baseline)
+1. In [base_configs/pretrain.py](base_configs/pretrain.py), set "config.data.root" to the path where the X-Magical dataset lies.
+2. Run `python pretrain.py --config configs/xmagical/pretraining/tcc.py`
+3. Run `python compute_goal_embedding.py --experiment_path [PATH_TO_PRETRAIN_MODEL] --withheld_goals False`
+
+#### XIRL Mixed (Baseline)
+1. In [base_configs/pretrain.py](base_configs/pretrain.py), set "config.data.root" to the path where the MQME dataset lies.
+2. In [base_configs/xprefs.py](base_configs/xprefs.py), set "config.data.goal_examples" to the path where your goal examples dataset is.
+3. Run `python pretrain.py --config configs/xmagical/pretraining/tcc.py`
+4. Run `python compute_goal_embedding.py --experiment_path [PATH_TO_PRETRAIN_MODEL] --withheld_goals True`
+
+#### Goal Classifier (Baseline)
+1. In [base_configs/pretrain.py](base_configs/pretrain.py), set "config.data.root" to the path where the X-Magical dataset lies.
+2. Run `python pretrain.py --config configs/xmagical/pretraining/classifier.py`
+
+#### X-RLHF (Ours)
+1. In [base_configs/xprefs.py](base_configs/xprefs.py), set "config.data.demonstrations_root" to the path where the MQME dataset lies.
+2. In the same config file, set "config.irl.learning_type" to "RLHF"
+3. Run `python xprefs_irl.py`
+
+#### XPrefs (Ours)
+1. In [base_configs/xprefs.py](base_configs/xprefs.py), set "config.data.demonstrations_root" to the path where the MQME dataset lies.
+2. In the same config file, set "config.irl.learning_type" to "XPrefs"
+3. In the same config file, set "config.data.goal_examples" to the path where your goal examples dataset is.
+4. Run `python xprefs_irl.py`
+5. Run `python compute_goal_embedding.py --experiment_path [PATH_TO_PRETRAIN_MODEL] --withheld_goals True`
+
+#### XTriplets (Ours)
+1. In [base_configs/pretrain.py](base_configs/pretrain.py), set "config.data.demonstrations_root" to the path where the MQME dataset lies.
+2. In [base_configs/xprefs.py](base_configs/xprefs.py), set "config.data.goal_examples" to the path where your goal examples dataset is.
+3. Run `python pretrain.py --config configs/xmagical/pretraining/triplets.py`
+3. Run `python compute_goal_embedding.py --experiment_path [PATH_TO_PRETRAIN_MODEL] --withheld_goals True`
+
+#### XIRL-Buckets (Ours)
+1. In [base_configs/pretrain.py](base_configs/pretrain.py), set "config.data.demonstrations_root" to the path where the MQME dataset lies.
+2. In [base_configs/xprefs.py](base_configs/xprefs.py), set "config.data.goal_examples" to the path where your goal examples dataset is.
+3. Run `python xprefs/bucket_trainer`
+4. Run `python compute_goal_embedding.py --experiment_path [PATH_TO_PRETRAIN_MODEL] --withheld_goals True`
+
+
+### Reinforcement Learning
+
+#### Ground Truth Reward
+1. Run `python rl_xmagical_env_reward.py --embodiment mediumstick`
+
+#### For all other learned methods, follow these instructions.
+1. In [base_configs/rl.py](base_configs/rl.py), set the value of "config.reward_wrapper.type" to the appropriate value from the list below.
+   1. `'distance_to_goal'` if reward learning was XIRL, XIRL Mixed, XTriplets, or XIRL-Buckets
+   2. `'goal_classifier'` if reward learning was "Goal Classifier"
+   3. `'reward_prediction_from_prefs'` if reward learning was XPrefs
+   4. `'RLHF'` if reward learning was "X-RLHF".
+2. In the same config file, set config.reward_wrapper.pretrained_path to the experiment directory where the reward learning model was saved.
+3. Run `python rl_xmagical_learned_reward.py --pretrained_path [PATH_TO_PRETRAINING_DIR]`
 
 ## Code Navigation
 
-At a high-level, our code relies on two important but generic python scripts: `pretrain.py` for pretraining and `train_policy.py` for reinforcement learning. We use [ml_collections](https://github.com/google/ml_collections) to parameterize these scripts with experiment-specific config files. **All experiments must use config files that inherit from the base config files in `base_configs/`**. Specifically, pretraining experiments must inherit from `base_configs/pretrain.py` and RL experiments must inherit from `base_configs/rl.py`.
-
-The rest of the codebase is organized as follows:
-
-* `configs/` contains all config files used in our CoRL submission. They inherit from `base_configs/`.
-* `xirl/` is the core pretraining codebase.
-* `sac/` is the core Soft-Actor-Critic implementation adapted from [pytorch_sac](https://github.com/denisyarats/pytorch_sac).
-* `scripts/` contains miscellaneous bash scripts.
-
-## Experiments: Reproducing Paper Results
-
-**Core Scripts**
-
-- [x] Same-embodiment setting (Section 5.1)
-    - [x] Pretraining: `python pretrain_xmagical_same_embodiment.py --help`
-    - [x] RL: `python rl_xmagical_learned_reward.py --help`
-- [x] Cross-embodiment setting (Section 5.2)
-    - [x] Pretraining: `python pretrain_xmagical_cross_embodiment.py --help`
-    - [x] RL: `python rl_xmagical_learned_reward.py --help`
-- [x] RL with environment reward
-    - [x] `python rl_xmagical_env_reward.py --help`
-- [x] Interactive reward visualization (Section 5.4)
-    - [x] `python interact_reward.py --help`
-
-**Misc. Scripts**
-
-- [x] Visualize dataloader for frame sampler debugging
-    - [x] `python debug_dataset.py --help`
-- [x] Compute goal embedding with a pretrained model
-    - [x] `python compute_goal_embedding.py --help`
-- [x] Quick n' dirty multi-GPU RL training
-    - [x] With environment reward: `bash scripts/launch_rl_multi_gpu.sh`
-
-## Extending XIRL
-
-> How can I implement my own self-supervised pretraining algorithm?
-
-You'll want to inherit from `xirl.trainers.base.Trainer` and implement the `__init__` and `compute_loss` methods. For reference, take a look at `xirl/trainers/tcc.py` to see how Temporal Cycle Consistency is implemented. Make sure to add your new algorithm to the `TRAINERS` dict in `factory.py`.
-
-> How do I modify the way frames are sampled in the dataloader?
-
-Create your own sampler in `xirl/frame_samplers.py` and add it to the `FRAME_SAMPLERS` dict in `factory.py`.
-
-> How can I implement additional pretraining evaluation metrics?
-
-You'll want to inherit from `xirl.evaluators.base.Evaluator` class and as you guessed, add it to the `EVALUATORS` dict in `factory.py`. See `xirl/evaluators` for our current list of qualitative and quantative evaluation metrics
-
-## Acknowledgments
-
-Many people have contibuted one way or another in the making and shaping of this repository. In no particular order, we'd like to thank [Alex Nichol](https://aqnichol.com/), [Nick Hynes](https://www.linkedin.com/in/nhynes-), [Brent Yi](https://brentyi.com/), [Jimmy Wu](https://www.cs.princeton.edu/~jw60/) and [Sam Toyer](https://scholar.google.com.au/citations?user=J8E8GQYAAAAJ&hl=en) for their fruitful back-and-forth discussions.
-
-## Citation
-
-If you find this code useful, consider citing our work:
-
-```bibtex
-@inproceedings{zakka2021xirl,
-  author    = {Zakka, Kevin and Zeng, Andy and Florence, Pete and Tompson, Jonathan and Bohg, Jeannette and Dwibedi, Debidatta},
-  title     = {XIRL: Cross-embodiment Inverse Reinforcement Learning},
-  booktitle = {Proceedings of the 5th Conference on Robot Learning (CoRL)},
-  year      = {2021},
-}
-```
+Please refer to the [original repository](https://x-irl.github.io/) for up-to-date information on code navigation and structure. They are the engineers behind the great architecture and usability.

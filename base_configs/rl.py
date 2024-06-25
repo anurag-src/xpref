@@ -52,28 +52,12 @@ def get_config():
   config.frame_stack = 3
 
   config.reward_wrapper = ml_collections.ConfigDict()
-  # config.reward_wrapper.pretrained_path = "/home/connor/Documents/xprefs/pretrain_runs/dataset=xmagical_mode=cross_algo=xirl_embodiment=mediumstick/"
 
-  # Can be one of ['distance_to_goal', 'goal_classifier', 'reward_prediction_from_prefs', None].
-  # config.reward_wrapper.type = "reward_prediction_from_prefs"
-  # config.reward_wrapper.type = "goal_classifier"
+  # Can be one of ['distance_to_goal', 'goal_classifier', 'reward_prediction_from_prefs', 'RLHF', None].
   config.reward_wrapper.type = "distance_to_goal"
-  # config.reward_wrapper.type = "RLHF"
-  # config.reward_wrapper.type = None
 
   # Either a TCC model (if 'distance_to_goal') or an XPrefs model (if 'reward_prediction_from_prefs')
-  # config.reward_wrapper.pretrained_path = os.path.expanduser("/home/connor/Documents/Xpref/learned_reward_models/xprefs_mediumstick_cross_5k")
-  # config.reward_wrapper.pretrained_path = os.path.expanduser("/home/connor/Documents/Xpref/learned_reward_models/xirl")
-  # config.reward_wrapper.pretrained_path = os.path.expanduser("/home/connor/Documents/Xpref/learned_reward_models/xirl_mixed_data")
-  # config.reward_wrapper.pretrained_path = os.path.expanduser("/home/connor/Documents/Xpref/learned_reward_models/rlhf_mediumstick_cross_5k")
-  # config.reward_wrapper.pretrained_path = os.path.expanduser("/home/connor/Documents/Xpref/learned_reward_models/tcc_buckets")
-  # config.reward_wrapper.pretrained_path = os.path.expanduser("/home/connor/Documents/Xpref/experiments/xprefs_w_zero_goal_e_FINAL")
-  # config.reward_wrapper.pretrained_path = os.path.expanduser("/home/connor/Documents/Xpref/pretrain_runs/GoalClassifier")
-  # config.reward_wrapper.pretrained_path = os.path.expanduser("/home/connor/Documents/Xpref/pretrain_runs/TripletLearning2")
-  # config.reward_wrapper.pretrained_path = os.path.expanduser("/home/connor/Documents/Xpref/experiments/4_buckets_mqme")
-  config.reward_wrapper.pretrained_path = os.path.expanduser("/home/connor/Documents/Xpref/pretrain_runs/Triplets_Final")
-  # config.reward_wrapper.pretrained_path = os.path.expanduser("~/Documents/Xpref/pretrain_runs/tcc_mediumstick/")
-
+  config.reward_wrapper.pretrained_path = os.path.expanduser("~/Documents/Xpref/pretrain_runs/XTriplets")
 
   # ================================================= #
   # Training parameters.

@@ -278,7 +278,7 @@ class LearnedVisualReward(abc.ABC, gym.Wrapper):
         return pixels
 
     @abc.abstractmethod
-    def _get_reward_from_image(self, image):
+    def _get_reward_from_image(self, image, to_tensor=True):
         """Forward the pixels through the model and compute the reward."""
 
     def step(self, action):
@@ -289,6 +289,9 @@ class LearnedVisualReward(abc.ABC, gym.Wrapper):
         pixels = self._render_obs()
         learned_reward = self._get_reward_from_image(pixels)
         return obs, learned_reward, done, info
+
+    def peak_reward(self, image):
+        return self._get_reward_from_image(image, to_tensor=False)
 
 
 class DistanceToGoalLearnedVisualReward(LearnedVisualReward):
@@ -313,9 +316,9 @@ class DistanceToGoalLearnedVisualReward(LearnedVisualReward):
         self._goal_emb = np.atleast_2d(goal_emb)
         self._distance_scale = distance_scale
 
-    def _get_reward_from_image(self, image):
+    def _get_reward_from_image(self, image, to_tensor=True):
         """Forward the pixels through the model and compute the reward."""
-        image_tensor = self._to_tensor(image)
+        image_tensor = self._to_tensor(image) if to_tensor else image
         emb = self._model.infer(image_tensor).numpy().embs
         dist = -1.0 * np.linalg.norm(emb - self._goal_emb)
         dist *= self._distance_scale
@@ -325,9 +328,9 @@ class DistanceToGoalLearnedVisualReward(LearnedVisualReward):
 class GoalClassifierLearnedVisualReward(LearnedVisualReward):
     """Replace the environment reward with the output of a goal classifier."""
 
-    def _get_reward_from_image(self, image):
+    def _get_reward_from_image(self, image, to_tensor=True):
         """Forward the pixels through the model and compute the reward."""
-        image_tensor = self._to_tensor(image)
+        image_tensor = self._to_tensor(image) if to_tensor else image
         prob = torch.sigmoid(self._model.infer(image_tensor).embs)
         return prob.item()
 
@@ -354,7 +357,7 @@ class InferredFromEmbeddingReward(LearnedVisualReward):
     """
         super().__init__(**base_kwargs)
 
-        device = "cuda"
+        device = self._device
 
         self.goal_embedding = self.calculate_goal_embedding(expiriment_dir)
         self.reward_predictor = Resnet18LinearEncoderNet(
@@ -382,9 +385,9 @@ class InferredFromEmbeddingReward(LearnedVisualReward):
             raise Exception(
                 f"Expected folder {expiriment_dir} to contain a valid checkpoint for model, but checkpoint file could not be loaded")
 
-    def _get_reward_from_image(self, image):
+    def _get_reward_from_image(self, image, to_tensor=True):
         """Forward the pixels through the model and compute the reward."""
-        image_tensor = self._to_tensor(image)
+        image_tensor = self._to_tensor(image) if to_tensor else image
         embs = self.reward_predictor.infer(image_tensor).numpy().embs
         dist_to_goal = -(1.0 / self.kappa) * (np.linalg.norm(embs - self.goal_embedding))
         return dist_to_goal
@@ -415,7 +418,7 @@ class RLHFInferredReward(LearnedVisualReward):
             num_ctx_frames=1,
             normalize_embeddings=False,
             learnable_temp=False,
-        ).to("cuda")
+        ).to(self._device)
         # self.reward_predictor.eval()
 
         try:
@@ -435,9 +438,9 @@ class RLHFInferredReward(LearnedVisualReward):
             raise Exception(
                 f"Expected folder {expiriment_dir} to contain a valid checkpoint for model, but checkpoint file could not be loaded")
 
-    def _get_reward_from_image(self, image):
+    def _get_reward_from_image(self, image, to_tensor=True):
         """Forward the pixels through the model and compute the reward."""
-        image_tensor = self._to_tensor(image)
+        image_tensor = self._to_tensor(image) if to_tensor else image
         embs = self.reward_predictor.infer(image_tensor).numpy().embs
         return embs[0][0]
 

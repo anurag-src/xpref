@@ -112,6 +112,9 @@ class Trainer(abc.ABC):
     aux_loss = self.compute_auxiliary_loss(out, batch)
     total_loss = loss + aux_loss
 
+    # Gradient Clipping
+    torch.nn.utils.clip_grad_norm(self._model.parameters(), 10e5)
+
     # Backwards pass + optimization step.
     total_loss.backward()
     self._optimizer.step()

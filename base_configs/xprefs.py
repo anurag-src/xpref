@@ -33,7 +33,7 @@ def get_config():
     config.data.truncate_validation_loop = 1000
     config.data.truncate_testing_preferences = 1000
     config.data.goal_examples = os.path.expanduser("~/Documents/Xpref/goal_examples")
-    config.data.truncate_goals = 200
+    config.data.truncate_goals = 800
     config.data.batch_size = 32
     config.data.train_embodiments = ["longstick","shortstick","gripper"]
     config.data.validation_embodiments = ["longstick","shortstick","gripper"]

@@ -5,14 +5,17 @@ import pandas as pd
 
 methods = [
     ("gt_reward.txt", "Ground Truth"),
-    ("xirl_reward.txt", "XIRL (XMagical)"),
-    ("xirl_mqme_reward.txt", "XIRL (MQME)"),
-    ("buckets_reward.txt", "TCC Buckets"),
-    ("rlhf_reward.txt", "RLHF"),
-    ("xprefs_reward.txt", "XPrefs"),
-    ("xprefs_0G.txt", "XPrefs (g=0)"),
+    ("xirl_reward.txt", "XIRL"),
+    ("xirl_mqme_reward.txt", "XIRL Mixed"),
     ("goal_classifier.txt", "Goal Classifier"),
-    ("triplets.txt", "Triplet Repr. (Tian et al.)"),
+    ("rlhf_reward.txt", "X-RLHF"),
+    ("triplets.txt", "XTriplets"),
+    ("buckets_reward.txt", "XIRL-Buckets"),
+
+    ("xprefs_reward.txt", "XPrefs"),
+    # ("xprefs_0G.txt", "XPrefs (g=0)"),
+
+
     # ("4_buckets.txt", "Buckets-4"),
 ]
 
@@ -21,7 +24,7 @@ def load_data(method):
     return arr
 
 if __name__ == "__main__":
-    fig, ax = plt.subplots(9, 1, figsize=(8, 8), sharex=True)
+    fig, ax = plt.subplots(7, 1, figsize=(8, 9), sharex=True)
     for i in range(len(methods)):
         m = methods[i][0]
         n = methods[i][1]
@@ -35,18 +38,23 @@ if __name__ == "__main__":
 
         if i == 0:
             ax[i].set_ylim(bottom=-0.05, top=1.1)
-        if 1 <= i <= 3:
+        if 1 <= i <= 2:
             ax[i].set_ylim(bottom=-1, top=0.05)
+        if i == 3:
+            ax[i].set_ylim(bottom=-0.05, top=1.1)
         if i == 4:
             ax[i].set_ylim(bottom=-35, top=25)
         if i == 5:
-            ax[i].set_ylim(bottom=-105, top=-60)
+            pass
+            # ax[i].set_ylim(bottom=-1.3, top=-0.5)
+            # ax[i].set_ylim(bottom=-0.25, top=-0.12)
+            # ax[i].set_ylim(bottom=-105, top=-60) # XPrefs
         if i == 6:
-            ax[i].set_ylim(bottom=-0.25, top=-0.12)
-        if i == 7:
-            ax[i].set_ylim(bottom=-0.05, top=1.1)
-        if i == 8:
-            ax[i].set_ylim(bottom=-27, top=-11)
+            ax[i].set_ylim(bottom=-1, top=0.05)
+
+
+        # if i == 8:
+        #     ax[i].set_ylim(bottom=-10, top=-4)
         # ax.fill_between(x, y + err, y - err, alpha=0.15)
 
     # plt.ylabel("Training Loss")

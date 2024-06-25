@@ -88,6 +88,9 @@ class SelfSupervisedModel(abc.ABC, nn.Module):
     if learnable_temp:
       self.logit_scale = nn.Parameter(torch.ones([]))
 
+  def tensor_contains_nan(self, tensor):
+    return torch.isnan(tensor).any()
+
   def forward(self, x):
     """Forward the video frames through the network.
 
@@ -98,6 +101,7 @@ class SelfSupervisedModel(abc.ABC, nn.Module):
     Returns:
       An instance of SelfSupervisedOutput.
     """
+
     batch_size, t, c, h, w = x.shape
     x_flat = x.view((batch_size * t, c, h, w))
     feats = self.backbone(x_flat)
@@ -110,6 +114,7 @@ class SelfSupervisedModel(abc.ABC, nn.Module):
       embs = logit_scale * embs
     embs = embs.view((batch_size, t, -1))
     feats = feats.view((batch_size, t, -1))
+
     return SelfSupervisedOutput(frames=x, feats=feats, embs=embs)
 
   @torch.no_grad()
@@ -127,7 +132,8 @@ class SelfSupervisedModel(abc.ABC, nn.Module):
       out = []
       for i in range(math.ceil(x.shape[1] / effective_bs)):
         sub_frames = x[:, i * effective_bs:(i + 1) * effective_bs]
-        out.append(self.forward(sub_frames).cpu())
+        embs = self.forward(sub_frames).cpu()
+        out.append(embs)
       out = SelfSupervisedOutput.merge(out)
     else:
       out = self.forward(x).cpu()
@@ -148,6 +154,15 @@ class Resnet18LinearEncoderNet(SelfSupervisedModel):
 
     # Encoder.
     self.encoder = nn.Linear(num_ftrs, embedding_size)
+
+
+class Resnet18FrozenBackbone(Resnet18LinearEncoderNet):
+  """A resnet18 backbone with a linear encoder head."""
+
+  def __init__(self, embedding_size, *args, **kwargs):
+    super().__init__(embedding_size, *args, **kwargs)
+    for param in self.backbone.parameters():
+      param.requires_grad = False
 
 
 class GoalClassifier(SelfSupervisedModel):

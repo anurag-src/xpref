@@ -3,14 +3,15 @@ import os
 import numpy as np
 
 methods = [
-    "Ground_Truth",
-    "RLHF",
-    "TCC_Buckets",
+    "Ground Truth",
     "XIRL",
     "XIRL Mixed",
+    "Goal Classifier",
+    "X-RLHF",
+    "XTriplets",
+    "XIRL-Buckets",
     "XPrefs",
     "XPrefs_0G",
-    "Goal_Classifier",
 ]
 
 def load_mean_and_std_error(method):
@@ -30,13 +31,14 @@ if __name__ == "__main__":
         x = u[:, -1]
         y = u[:, 0]
         err = err[:, 0]
-        ax.plot(x, y, label=m)
+        ax.plot(x, y, label=m if m != "XPrefs_0G" else "XPrefs (g=0)")
         ax.fill_between(x, y + err, y - err, alpha=0.15)
 
     plt.ylabel("Cumulative Ground Truth Reward")
     plt.xlabel("SAC Training Steps")
-    plt.title("Representation Methods Evaluated Under the GT Reward")
+    plt.title("RL Performance of Learned Rewards Evaluated Under the GT Reward")
     fig.tight_layout()
     plt.legend()
     plt.savefig("results-comparision.pdf", format="pdf", bbox_inches="tight")
+    # plt.show()
     fig.show()

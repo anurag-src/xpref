@@ -68,6 +68,25 @@ def embed(
     distance_scale = 1.0 / dist_to_goal
     return goal_emb, distance_scale
 
+def distance_calc(
+        model,
+        downstream_loader,
+        goal_emb,
+        device,
+):
+    """Embed the stored trajectories and compute mean goal embedding."""
+    init_embs = []
+    for class_name, class_loader in downstream_loader.items():
+        logging.info("Embedding %s.", class_name)
+        for batch in tqdm(iter(class_loader), leave=False):
+            out = model.infer(batch["frames"].to(device))
+            emb = out.numpy().embs
+            init_embs.append(emb[0, :])
+    dist_to_goal = np.linalg.norm(
+        np.stack(init_embs, axis=0) - goal_emb, axis=-1).mean()
+    distance_scale = 1.0 / dist_to_goal
+    return goal_emb, distance_scale
+
 def embed_withheld_goals(
         model,
         downstream_loader,
@@ -81,8 +100,10 @@ def embed_withheld_goals(
         for batch in tqdm(iter(class_loader), leave=False):
             out = model.infer(batch["frames"].to(device))
             emb = out.embs.numpy()
-            goal_embs.append(emb)
-    goal_emb = np.mean(np.stack(goal_embs, axis=0), axis=0, keepdims=True)
+            for i in range(len(emb)):
+                goal_embs.append(emb[i, :])
+    goal_emb = np.mean(np.stack(goal_embs, axis=0), axis=0)
+    print(goal_emb.shape)
     return goal_emb, 1.0
 
 
@@ -127,7 +148,12 @@ def main(_):
 
     if FLAGS.withheld_goals:
         # Distance Scale is 1.0 by default in this case
-        goal_emb, distance_scale = embed_withheld_goals(model, downstream_loader, device)
+        goal_emb, _ = embed_withheld_goals(model, downstream_loader, device)
+
+        # Revert to default to get the distance metric
+        FLAGS.withheld_goals = False
+        _, downstream_loader = setup()
+        _, distance_scale = distance_calc(model, downstream_loader, goal_emb, device)
     else:
         goal_emb, distance_scale = embed(model, downstream_loader, device)
 

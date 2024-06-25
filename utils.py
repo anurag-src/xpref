@@ -40,95 +40,104 @@ import yaml
 ConfigDict = config_dict.ConfigDict
 FrozenConfigDict = config_dict.FrozenConfigDict
 
+
 # ========================================= #
 # Experiment utils.
 # ========================================= #
 
 
-def setup_experiment(exp_dir, config, resume = False):
-  """Initializes a pretraining or RL experiment."""
-  #  If the experiment directory doesn't exist yet, creates it and dumps the
-  # config dict as a yaml file and git hash as a text file.
-  # If it exists already, raises a ValueError to prevent overwriting
-  # unless resume is set to True.
-  if os.path.exists(exp_dir):
-    if not resume:
-      raise ValueError(
-          "Experiment already exists. Run with --resume to continue.")
-    load_config_from_dir(exp_dir, config)
-  else:
-    os.makedirs(exp_dir)
-    with open(os.path.join(exp_dir, "config.yaml"), "w") as fp:
-      yaml.dump(ConfigDict.to_dict(config), fp)
-    with open(os.path.join(exp_dir, "git_hash.txt"), "w") as fp:
-      fp.write(git_revision_hash())
+def setup_experiment(exp_dir, config, resume=False):
+    """Initializes a pretraining or RL experiment."""
+    #  If the experiment directory doesn't exist yet, creates it and dumps the
+    # config dict as a yaml file and git hash as a text file.
+    # If it exists already, raises a ValueError to prevent overwriting
+    # unless resume is set to True.
+    if os.path.exists(exp_dir):
+        if not resume:
+            raise ValueError(
+                f"Experiment already exists at {exp_dir}. Run with --resume to continue.")
+        load_config_from_dir(exp_dir, config)
+    else:
+        os.makedirs(exp_dir)
+        with open(os.path.join(exp_dir, "config.yaml"), "w") as fp:
+            yaml.dump(ConfigDict.to_dict(config), fp)
+        with open(os.path.join(exp_dir, "git_hash.txt"), "w") as fp:
+            fp.write(git_revision_hash())
 
 
 def load_config_from_dir(
-    exp_dir,
-    config = None,
+        exp_dir,
+        config=None,
 ):
-  """Load experiment config."""
-  with open(os.path.join(exp_dir, "config.yaml"), "r") as fp:
-    cfg = yaml.load(fp, Loader=yaml.FullLoader)
-  # Inplace update the config if one is provided.
-  if config is not None:
-    config.update(cfg)
-    return
-  return ConfigDict(cfg)
+    """Load experiment config."""
+    with open(os.path.join(exp_dir, "config.yaml"), "r") as fp:
+        cfg = yaml.load(fp, Loader=yaml.FullLoader)
+    # Inplace update the config if one is provided.
+    if config is not None:
+        config.update(cfg)
+        return
+    return ConfigDict(cfg)
+
+def extract_kappa_from_exp(
+        exp_dir,
+):
+    """Load experiment config."""
+    with open(os.path.join(exp_dir, "normalize_embedding.yaml"), "r") as fp:
+        cfg = yaml.load(fp, Loader=yaml.FullLoader)
+    return cfg["kappa"]
 
 
 def dump_config(exp_dir, config):
-  """Dump config to disk."""
-  # Note: No need to explicitly delete the previous config file as "w" will
-  # overwrite the file if it already exists.
-  with open(os.path.join(exp_dir, "config.yaml"), "w") as fp:
-    yaml.dump(ConfigDict.to_dict(config), fp)
+    """Dump config to disk."""
+    # Note: No need to explicitly delete the previous config file as "w" will
+    # overwrite the file if it already exists.
+    with open(os.path.join(exp_dir, "config.yaml"), "w") as fp:
+        yaml.dump(ConfigDict.to_dict(config), fp)
 
 
 def copy_config_and_replace(
-    config,
-    update_dict = None,
-    freeze = False,
+        config,
+        update_dict=None,
+        freeze=False,
 ):
-  """Makes a copy of a config and optionally updates its values."""
-  # Using the ConfigDict constructor leaves the `FieldReferences` untouched
-  # unlike `ConfigDict.copy_and_resolve_references`.
-  new_config = ConfigDict(config)
-  if update_dict is not None:
-    new_config.update(update_dict)
-  if freeze:
-    return FrozenConfigDict(new_config)
-  return new_config
+    """Makes a copy of a config and optionally updates its values."""
+    # Using the ConfigDict constructor leaves the `FieldReferences` untouched
+    # unlike `ConfigDict.copy_and_resolve_references`.
+    new_config = ConfigDict(config)
+    if update_dict is not None:
+        new_config.update(update_dict)
+    if freeze:
+        return FrozenConfigDict(new_config)
+    return new_config
 
 
 def load_model_checkpoint(pretrained_path, device):
-  """Load a pretrained model and optionally a precomputed goal embedding."""
-  config = load_config_from_dir(pretrained_path)
-  model = common.get_model(config)
-  model.to(device).eval()
-  checkpoint_dir = os.path.join(pretrained_path, "checkpoints")
-  checkpoint_manager = CheckpointManager(checkpoint_dir, model=model)
-  global_step = checkpoint_manager.restore_or_initialize()
-  logging.info("Restored model from checkpoint %d.", global_step)
-  return config, model
+    """Load a pretrained model and optionally a precomputed goal embedding."""
+    config = load_config_from_dir(pretrained_path)
+    model = common.get_model(config)
+    model.to(device).eval()
+    checkpoint_dir = os.path.join(pretrained_path, "checkpoints")
+    checkpoint_manager = CheckpointManager(checkpoint_dir, model=model)
+    global_step = checkpoint_manager.restore_or_initialize()
+    logging.info("Restored model from checkpoint %d.", global_step)
+    return config, model
 
 
 def save_pickle(experiment_path, arr, name):
-  """Save an array as a pickle file."""
-  filename = os.path.join(experiment_path, name)
-  with open(filename, "wb") as fp:
-    pickle.dump(arr, fp)
-  logging.info("Saved %s to %s", name, filename)
+    """Save an array as a pickle file."""
+    filename = os.path.join(experiment_path, name)
+    with open(filename, "wb") as fp:
+        pickle.dump(arr, fp)
+    logging.info("Saved %s to %s", name, filename)
 
 
 def load_pickle(pretrained_path, name):
-  """Load a pickled array."""
-  filename = os.path.join(pretrained_path, name)
-  with open(filename, "rb") as fp:
-    arr = pickle.load(fp)
-  logging.info("Successfully loaded %s from %s", name, filename)
-  return arr
+    """Load a pickled array."""
+    filename = os.path.join(pretrained_path, name)
+    with open(filename, "rb") as fp:
+        arr = pickle.load(fp)
+    logging.info("Successfully loaded %s from %s", name, filename)
+    return arr
 
 
 # ========================================= #
@@ -137,14 +146,14 @@ def load_pickle(pretrained_path, name):
 
 
 def make_env(
-    env_name,
-    seed,
-    save_dir = None,
-    add_episode_monitor = True,
-    action_repeat = 1,
-    frame_stack = 1,
+        env_name,
+        seed,
+        save_dir=None,
+        add_episode_monitor=True,
+        action_repeat=1,
+        frame_stack=1,
 ):
-  """Env factory with wrapping.
+    """Env factory with wrapping.
 
   Args:
     env_name: The name of the environment.
@@ -157,33 +166,33 @@ def make_env(
   Returns:
     gym.Env object.
   """
-  # Check if the env is in x-magical.
-  xmagical.register_envs()
-  if env_name in xmagical.ALL_REGISTERED_ENVS:
-    env = gym.make(env_name)
-  else:
-    raise ValueError(f"{env_name} is not a valid environment name.")
+    # Check if the env is in x-magical.
+    xmagical.register_envs()
+    if env_name in xmagical.ALL_REGISTERED_ENVS:
+        env = gym.make(env_name)
+    else:
+        raise ValueError(f"{env_name} is not a valid environment name.")
 
-  if add_episode_monitor:
-    env = wrappers.EpisodeMonitor(env)
-  if action_repeat > 1:
-    env = wrappers.ActionRepeat(env, action_repeat)
-  env = RescaleAction(env, -1.0, 1.0)
-  if save_dir is not None:
-    env = wrappers.VideoRecorder(env, save_dir=save_dir)
-  if frame_stack > 1:
-    env = wrappers.FrameStack(env, frame_stack)
+    if add_episode_monitor:
+        env = wrappers.EpisodeMonitor(env)
+    if action_repeat > 1:
+        env = wrappers.ActionRepeat(env, action_repeat)
+    env = RescaleAction(env, -1.0, 1.0)
+    if save_dir is not None:
+        env = wrappers.VideoRecorder(env, save_dir=save_dir)
+    if frame_stack > 1:
+        env = wrappers.FrameStack(env, frame_stack)
 
-  # Seed.
-  env.seed(seed)
-  env.action_space.seed(seed)
-  env.observation_space.seed(seed)
+    # Seed.
+    env.seed(seed)
+    env.action_space.seed(seed)
+    env.observation_space.seed(seed)
 
-  return env
+    return env
 
 
 def wrap_learned_reward(env, config):
-  """Wrap the environment with a learned reward wrapper.
+    """Wrap the environment with a learned reward wrapper.
 
   Args:
     env: A `gym.Env` to wrap with a `LearnedVisualRewardWrapper` wrapper.
@@ -193,39 +202,64 @@ def wrap_learned_reward(env, config):
   Returns:
     gym.Env object.
   """
-  pretrained_path = config.reward_wrapper.pretrained_path
-  device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-  model_config, model = load_model_checkpoint(pretrained_path, device)
+    pretrained_path = config.reward_wrapper.pretrained_path
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Path: {pretrained_path}")
 
-  kwargs = {
-      "env": env,
-      "model": model,
-      "device": device,
-      "res_hw": model_config.data_augmentation.image_size,
-  }
+    if config.reward_wrapper.type in ["goal_classifier", "distance_to_goal"]:
+        model_config, model = load_model_checkpoint(pretrained_path, device)
+        kwargs = {
+            "env": env,
+            "model": model,
+            "device": device,
+            "res_hw": model_config.data_augmentation.image_size,
+        }
 
-  if config.reward_wrapper.type == "goal_classifier":
-    env = wrappers.GoalClassifierLearnedVisualReward(**kwargs)
+        if config.reward_wrapper.type == "goal_classifier":
+            env = wrappers.GoalClassifierLearnedVisualReward(**kwargs)
 
-  elif config.reward_wrapper.type == "distance_to_goal":
-    kwargs["goal_emb"] = load_pickle(pretrained_path, "goal_emb.pkl")
-    kwargs["distance_scale"] = load_pickle(pretrained_path,
-                                           "distance_scale.pkl")
-    env = wrappers.DistanceToGoalLearnedVisualReward(**kwargs)
+        elif config.reward_wrapper.type == "distance_to_goal":
+            kwargs["goal_emb"] = load_pickle(pretrained_path, "goal_emb.pkl")
+            kwargs["distance_scale"] = load_pickle(pretrained_path,
+                                                   "distance_scale.pkl")
+            env = wrappers.DistanceToGoalLearnedVisualReward(**kwargs)
 
-  else:
-    raise ValueError(
-        f"{config.reward_wrapper.type} is not a valid reward wrapper.")
+    # Reward Predictor Network
+    elif config.reward_wrapper.type == "reward_prediction_from_prefs":
+        kwargs = {
+            "env": env,
+            "expiriment_dir": pretrained_path,
+            "device": device,
+            "res_hw": load_config_from_dir(pretrained_path).data_augmentation.image_size,
+            # TODO: Fix the fact that we need a dummy model here
+            "model": torch.nn.Linear(32, 1), # This is just a dummy network to interface with XIRL
+        }
+        env = wrappers.InferredFromEmbeddingReward(**kwargs)
 
-  return env
+    elif config.reward_wrapper.type == "RLHF":
+        kwargs = {
+            "env": env,
+            "expiriment_dir": pretrained_path,
+            "device": device,
+            "res_hw": load_config_from_dir(pretrained_path).data_augmentation.image_size,
+            # TODO: Fix the fact that we need a dummy model here
+            "model": torch.nn.Linear(32, 1),  # This is just a dummy network to interface with XIRL
+        }
+        env = wrappers.RLHFInferredReward(**kwargs)
+
+    else:
+        raise ValueError(
+            f"{config.reward_wrapper.type} is not a valid reward wrapper.")
+
+    return env
 
 
 def make_buffer(
-    env,
-    device,
-    config,
+        env,
+        device,
+        config,
 ):
-  """Replay buffer factory.
+    """Replay buffer factory.
 
   Args:
     env: A `gym.Env`.
@@ -237,35 +271,48 @@ def make_buffer(
     ReplayBuffer.
   """
 
-  kwargs = {
-      "obs_shape": env.observation_space.shape,
-      "action_shape": env.action_space.shape,
-      "capacity": config.replay_buffer_capacity,
-      "device": device,
-  }
+    kwargs = {
+        "obs_shape": env.observation_space.shape,
+        "action_shape": env.action_space.shape,
+        "capacity": config.replay_buffer_capacity,
+        "device": device,
+    }
 
-  pretrained_path = config.reward_wrapper.pretrained_path
-  if not pretrained_path:
-    return replay_buffer.ReplayBuffer(**kwargs)
+    pretrained_path = config.reward_wrapper.pretrained_path
+    if not pretrained_path:
+        return replay_buffer.ReplayBuffer(**kwargs)
 
-  model_config, model = load_model_checkpoint(pretrained_path, device)
-  kwargs["model"] = model
-  kwargs["res_hw"] = model_config.data_augmentation.image_size
+    if config.reward_wrapper.type in ["goal_classifier", "distance_to_goal"]:
+        model_config, model = load_model_checkpoint(pretrained_path, device)
+        kwargs["model"] = model
+        kwargs["res_hw"] = model_config.data_augmentation.image_size
 
-  if config.reward_wrapper.type == "goal_classifier":
-    buffer = replay_buffer.ReplayBufferGoalClassifier(**kwargs)
+        if config.reward_wrapper.type == "goal_classifier":
+            buffer = replay_buffer.ReplayBufferGoalClassifier(**kwargs)
 
-  elif config.reward_wrapper.type == "distance_to_goal":
-    kwargs["goal_emb"] = load_pickle(pretrained_path, "goal_emb.pkl")
-    kwargs["distance_scale"] = load_pickle(pretrained_path,
-                                           "distance_scale.pkl")
-    buffer = replay_buffer.ReplayBufferDistanceToGoal(**kwargs)
+        elif config.reward_wrapper.type == "distance_to_goal":
+            kwargs["goal_emb"] = load_pickle(pretrained_path, "goal_emb.pkl")
+            kwargs["distance_scale"] = load_pickle(pretrained_path,
+                                                   "distance_scale.pkl")
+            buffer = replay_buffer.ReplayBufferDistanceToGoal(**kwargs)
 
-  else:
-    raise ValueError(
-        f"{config.reward_wrapper.type} is not a valid reward wrapper.")
+    elif config.reward_wrapper.type == "reward_prediction_from_prefs":
+        kwargs["expiriment_dir"] = pretrained_path
+        # TODO: Fix the fact that we need a dummy model here
+        kwargs["model"] = torch.nn.Linear(32, 1)  # This is just a dummy network to interface with XIRL
+        buffer = replay_buffer.ReplayBufferLearnedReward(**kwargs)
 
-  return buffer
+    elif config.reward_wrapper.type == "RLHF":
+        kwargs["expiriment_dir"] = pretrained_path
+        # TODO: Fix the fact that we need a dummy model here
+        kwargs["model"] = torch.nn.Linear(32, 1)  # This is just a dummy network to interface with XIRL
+        buffer = replay_buffer.ReplayBufferRewardLearningHumanFeedback(**kwargs)
+
+    else:
+        raise ValueError(
+            f"{config.reward_wrapper.type} is not a valid reward wrapper.")
+
+    return buffer
 
 
 # ========================================= #
@@ -274,16 +321,16 @@ def make_buffer(
 
 
 def plot_reward(rews):
-  """Plot raw and cumulative rewards over an episode."""
-  _, axes = plt.subplots(1, 2, figsize=(12, 4), sharex=True)
-  axes[0].plot(rews)
-  axes[0].set_xlabel("Timestep")
-  axes[0].set_ylabel("Reward")
-  axes[1].plot(np.cumsum(rews))
-  axes[1].set_xlabel("Timestep")
-  axes[1].set_ylabel("Cumulative Reward")
-  for ax in axes:
-    ax.grid(b=True, which="major", linestyle="-")
-    ax.grid(b=True, which="minor", linestyle="-", alpha=0.2)
-  plt.minorticks_on()
-  plt.show()
+    """Plot raw and cumulative rewards over an episode."""
+    _, axes = plt.subplots(1, 2, figsize=(12, 4), sharex=True)
+    axes[0].plot(rews)
+    axes[0].set_xlabel("Timestep")
+    axes[0].set_ylabel("Reward")
+    axes[1].plot(np.cumsum(rews))
+    axes[1].set_xlabel("Timestep")
+    axes[1].set_ylabel("Cumulative Reward")
+    for ax in axes:
+        ax.grid(b=True, which="major", linestyle="-")
+        ax.grid(b=True, which="minor", linestyle="-", alpha=0.2)
+    plt.minorticks_on()
+    plt.show()

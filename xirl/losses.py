@@ -37,7 +37,9 @@ def one_hot(y, K, smooth_eps = 0):  # pylint: disable=invalid-name
   """
   assert 0 <= smooth_eps <= 1
   assert y.ndim == 1, "Label tensor must be rank 1."
-  y_hot = torch.eye(K)[y] * (1 - smooth_eps) + (smooth_eps / (K - 1))
+
+  # C. Mattson - had to modify the subsequent line to get it to work on cuda
+  y_hot = torch.eye(K).to(y.device)[y] * (1 - smooth_eps) + (smooth_eps / (K - 1))
   return y_hot.to(y.device)
 
 

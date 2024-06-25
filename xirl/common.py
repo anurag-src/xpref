@@ -43,9 +43,9 @@ def get_pretraining_dataloaders(
   """
 
   def _loader(split):
-    dataset = factory.dataset_from_config(config, False, split, debug)
+    dataset = factory.dataset_from_config(config, False, split, debug, with_reward=(config.algorithm == "triplets"))
     batch_sampler = factory.video_sampler_from_config(
-        config, dataset.dir_tree, downstream=False, sequential=debug)
+        config, dataset.dir_tree, downstream=False, sequential=debug, rewards=dataset.reward_set if hasattr(dataset, 'reward_set') else None)
     return torch.utils.data.DataLoader(
         dataset,
         collate_fn=dataset.collate_fn,
@@ -61,9 +61,9 @@ def get_pretraining_dataloaders(
 
 
 def get_downstream_dataloaders(
-    config,
-    debug = False,
-):
+        config: object,
+        debug: object = False,
+) -> object:
   """Construct a train/valid pair of downstream dataloaders.
 
   Args:

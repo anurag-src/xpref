@@ -33,12 +33,13 @@ CONFIG_PATH = "configs/xmagical/rl/env_reward.py"
 flags.DEFINE_enum("embodiment", None, EMBODIMENTS, "Which embodiment to train.")
 flags.DEFINE_list("seeds", [0, 5], "List specifying the range of seeds to run.")
 flags.DEFINE_string("device", "cuda:0", "The compute device.")
+flags.DEFINE_bool("ground_truth",True,"using ground truth or not")
 
 
 def main(_):
   # Map the embodiment to the x-MAGICAL env name.
   env_name = XMAGICAL_EMBODIMENT_TO_ENV_NAME[FLAGS.embodiment]
-
+  ground_truth = FLAGS.ground_truth
   # Generate a unique experiment name.
   experiment_name = string_from_kwargs(
       env_name=env_name,
@@ -64,6 +65,8 @@ def main(_):
             f"{seed}",
             "--device",
             f"{FLAGS.device}",
+            "--ground_truth",
+            f"{FLAGS.ground_truth}",
         ]))
 
   # Wait for each seed to terminate.

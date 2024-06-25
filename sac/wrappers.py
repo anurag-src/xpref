@@ -20,12 +20,17 @@ import collections
 import os
 import time
 import typing
+import warnings
 
 import gym
 import imageio
 import numpy as np
 import torch
-from xirl.models import SelfSupervisedModel
+
+import utils
+from xirl import factory
+from xirl.models import SelfSupervisedModel, Resnet18LinearEncoderNet, ReinforcementLearningHumanFeedback
+from torchkit import CheckpointManager
 
 import cv2
 
@@ -37,102 +42,102 @@ InfoMetric = typing.Mapping[str, typing.Mapping[str, typing.Any]]
 
 
 class FrameStack(gym.Wrapper):
-  """Stack the last k frames of the env into a flat array.
+    """Stack the last k frames of the env into a flat array.
 
   This is useful for allowing the RL policy to infer temporal information.
 
   Reference: https://github.com/ikostrikov/jaxrl/
   """
 
-  def __init__(self, env, k):
-    """Constructor.
+    def __init__(self, env, k):
+        """Constructor.
 
     Args:
       env: A gym env.
       k: The number of frames to stack.
     """
-    super().__init__(env)
+        super().__init__(env)
 
-    assert isinstance(k, int), "k must be an integer."
+        assert isinstance(k, int), "k must be an integer."
 
-    self._k = k
-    self._frames = collections.deque([], maxlen=k)
+        self._k = k
+        self._frames = collections.deque([], maxlen=k)
 
-    shp = env.observation_space.shape
-    self.observation_space = gym.spaces.Box(
-        low=env.observation_space.low.min(),
-        high=env.observation_space.high.max(),
-        shape=((shp[0] * k,) + shp[1:]),
-        dtype=env.observation_space.dtype,
-    )
+        shp = env.observation_space.shape
+        self.observation_space = gym.spaces.Box(
+            low=env.observation_space.low.min(),
+            high=env.observation_space.high.max(),
+            shape=((shp[0] * k,) + shp[1:]),
+            dtype=env.observation_space.dtype,
+        )
 
-  def reset(self):
-    obs = self.env.reset()
-    for _ in range(self._k):
-      self._frames.append(obs)
-    return self._get_obs()
+    def reset(self):
+        obs = self.env.reset()
+        for _ in range(self._k):
+            self._frames.append(obs)
+        return self._get_obs()
 
-  def step(self, action):
-    obs, reward, done, info = self.env.step(action)
-    self._frames.append(obs)
-    return self._get_obs(), reward, done, info
+    def step(self, action):
+        obs, reward, done, info = self.env.step(action)
+        self._frames.append(obs)
+        return self._get_obs(), reward, done, info
 
-  def _get_obs(self):
-    assert len(self._frames) == self._k
-    return np.concatenate(list(self._frames), axis=0)
+    def _get_obs(self):
+        assert len(self._frames) == self._k
+        return np.concatenate(list(self._frames), axis=0)
 
 
 class ActionRepeat(gym.Wrapper):
-  """Repeat the agent's action N times in the environment.
+    """Repeat the agent's action N times in the environment.
 
   Reference: https://github.com/ikostrikov/jaxrl/
   """
 
-  def __init__(self, env, repeat):
-    """Constructor.
+    def __init__(self, env, repeat):
+        """Constructor.
 
     Args:
       env: A gym env.
       repeat: The number of times to repeat the action per single underlying env
         step.
     """
-    super().__init__(env)
+        super().__init__(env)
 
-    assert repeat > 1, "repeat should be greater than 1."
-    self._repeat = repeat
+        assert repeat > 1, "repeat should be greater than 1."
+        self._repeat = repeat
 
-  def step(self, action):
-    total_reward = 0.0
-    for _ in range(self._repeat):
-      obs, rew, done, info = self.env.step(action)
-      total_reward += rew
-      if done:
-        break
-    return obs, total_reward, done, info
+    def step(self, action):
+        total_reward = 0.0
+        for _ in range(self._repeat):
+            obs, rew, done, info = self.env.step(action)
+            total_reward += rew
+            if done:
+                break
+        return obs, total_reward, done, info
 
 
 class RewardScale(gym.Wrapper):
-  """Scale the environment reward."""
+    """Scale the environment reward."""
 
-  def __init__(self, env, scale):
-    """Constructor.
+    def __init__(self, env, scale):
+        """Constructor.
 
     Args:
       env: A gym env.
       scale: How much to scale the reward by.
     """
-    super().__init__(env)
+        super().__init__(env)
 
-    self._scale = scale
+        self._scale = scale
 
-  def step(self, action):
-    obs, reward, done, info = self.env.step(action)
-    reward *= self._scale
-    return obs, reward, done, info
+    def step(self, action):
+        obs, reward, done, info = self.env.step(action)
+        reward *= self._scale
+        return obs, reward, done, info
 
 
 class EpisodeMonitor(gym.ActionWrapper):
-  """A class that computes episode metrics.
+    """A class that computes episode metrics.
 
   At minimum, episode return, length and duration are computed. Additional
   metrics that are logged in the environment's info dict can be monitored by
@@ -141,78 +146,78 @@ class EpisodeMonitor(gym.ActionWrapper):
   Reference: https://github.com/ikostrikov/jaxrl/
   """
 
-  def __init__(self, env):
-    super().__init__(env)
+    def __init__(self, env):
+        super().__init__(env)
 
-    self._reset_stats()
-    self.total_timesteps: int = 0
+        self._reset_stats()
+        self.total_timesteps: int = 0
 
-  def _reset_stats(self):
-    self.reward_sum: float = 0.0
-    self.episode_length: int = 0
-    self.start_time = time.time()
+    def _reset_stats(self):
+        self.reward_sum: float = 0.0
+        self.episode_length: int = 0
+        self.start_time = time.time()
 
-  def step(self, action):
-    obs, rew, done, info = self.env.step(action)
+    def step(self, action):
+        obs, rew, done, info = self.env.step(action)
 
-    self.reward_sum += rew
-    self.episode_length += 1
-    self.total_timesteps += 1
-    info["total"] = {"timesteps": self.total_timesteps}
+        self.reward_sum += rew
+        self.episode_length += 1
+        self.total_timesteps += 1
+        info["total"] = {"timesteps": self.total_timesteps}
 
-    if done:
-      info["episode"] = dict()
-      info["episode"]["return"] = self.reward_sum
-      info["episode"]["length"] = self.episode_length
-      info["episode"]["duration"] = time.time() - self.start_time
+        if done:
+            info["episode"] = dict()
+            info["episode"]["return"] = self.reward_sum
+            info["episode"]["length"] = self.episode_length
+            info["episode"]["duration"] = time.time() - self.start_time
 
-    return obs, rew, done, info
+        return obs, rew, done, info
 
-  def reset(self):
-    self._reset_stats()
-    return self.env.reset()
+    def reset(self):
+        self._reset_stats()
+        return self.env.reset()
 
 
 class VideoRecorder(gym.Wrapper):
-  """Wrapper for rendering and saving rollouts to disk.
+    """Wrapper for rendering and saving rollouts to disk.
 
   Reference: https://github.com/ikostrikov/jaxrl/
   """
 
-  def __init__(
-      self,
-      env,
-      save_dir,
-      resolution = (128, 128),
-      fps = 30,
-  ):
-    super().__init__(env)
+    def __init__(
+            self,
+            env,
+            save_dir,
+            resolution=(128, 128),
+            fps=30,
+    ):
+        super().__init__(env)
 
-    self.save_dir = save_dir
-    os.makedirs(save_dir, exist_ok=True)
+        self.save_dir = save_dir
+        os.makedirs(save_dir, exist_ok=True)
 
-    self.height, self.width = resolution
-    self.fps = fps
-    self.enabled = True
-    self.current_episode = 0
-    self.frames = []
+        self.height, self.width = resolution
+        self.fps = fps
+        self.enabled = True
+        self.current_episode = 0
+        self.frames = []
 
-  def step(self, action):
-    frame = self.env.render(mode="rgb_array")
-    if frame.shape[:2] != (self.height, self.width):
-      frame = cv2.resize(
-          frame,
-          dsize=(self.width, self.height),
-          interpolation=cv2.INTER_CUBIC,
-      )
-    self.frames.append(frame)
-    observation, reward, done, info = self.env.step(action)
-    if done:
-      filename = os.path.join(self.save_dir, f"{self.current_episode}.mp4")
-      imageio.mimsave(filename, self.frames, fps=self.fps)
-      self.frames = []
-      self.current_episode += 1
-    return observation, reward, done, info
+    def step(self, action):
+        frame = self.env.render(mode="rgb_array")
+        if frame.shape[:2] != (self.height, self.width):
+            frame = cv2.resize(
+                frame,
+                dsize=(self.width, self.height),
+                interpolation=cv2.INTER_CUBIC,
+            )
+        self.frames.append(frame)
+        observation, reward, done, info = self.env.step(action)
+        if done:
+            filename = os.path.join(self.save_dir, f"{self.current_episode}.mp4")
+            imageio.mimsave(filename, self.frames, fps=self.fps)
+            self.frames = []
+            self.current_episode += 1
+        return observation, reward, done, info
 
 
 # ========================================= #
@@ -228,19 +233,19 @@ class VideoRecorder(gym.Wrapper):
 
 
 class LearnedVisualReward(abc.ABC, gym.Wrapper):
-  """Base wrapper class that replaces the env reward with a learned one.
+    """Base wrapper class that replaces the env reward with a learned one.
 
   Subclasses should implement the `_get_reward_from_image` method.
   """
 
-  def __init__(
-      self,
-      env,
-      model,
-      device,
-      res_hw = None,
-  ):
-    """Constructor.
+    def __init__(
+            self,
+            env,
+            model,
+            device,
+            res_hw=None,
+    ):
+        """Constructor.
 
     Args:
       env: A gym env.
@@ -250,52 +255,55 @@ class LearnedVisualReward(abc.ABC, gym.Wrapper):
       res_hw: Optional (H, W) to resize the environment image before feeding it
         to the model.
     """
-    super().__init__(env)
+        super().__init__(env)
 
-    self._device = device
-    self._model = model.to(device).eval()
-    self._res_hw = res_hw
+        self._device = device
+        self._model = model.to(device).eval()
+        self._res_hw = res_hw
 
-  def _to_tensor(self, x):
-    x = torch.from_numpy(x).permute(2, 0, 1).float()[None, None, Ellipsis]
-    # TODO(kevin): Make this more generic for other preprocessing.
-    x = x / 255.0
-    x = x.to(self._device)
-    return x
+    def _to_tensor(self, x):
+        x = torch.from_numpy(x).permute(2, 0, 1).float()[None, None, Ellipsis]
+        # TODO(kevin): Make this more generic for other preprocessing.
+        x = x / 255.0
+        x = x.to(self._device)
+        return x
 
-  def _render_obs(self):
-    """Render the pixels at the desired resolution."""
-    # TODO(kevin): Make sure this works for mujoco envs.
-    pixels = self.env.render(mode="rgb_array")
-    if self._res_hw is not None:
-      h, w = self._res_hw
-      pixels = cv2.resize(pixels, dsize=(w, h), interpolation=cv2.INTER_CUBIC)
-    return pixels
+    def _render_obs(self):
+        """Render the pixels at the desired resolution."""
+        # TODO(kevin): Make sure this works for mujoco envs.
+        pixels = self.env.render(mode="rgb_array")
+        if self._res_hw is not None:
+            h, w = self._res_hw
+            pixels = cv2.resize(pixels, dsize=(w, h), interpolation=cv2.INTER_CUBIC)
+        return pixels
 
-  @abc.abstractmethod
-  def _get_reward_from_image(self, image):
-    """Forward the pixels through the model and compute the reward."""
+    @abc.abstractmethod
+    def _get_reward_from_image(self, image, to_tensor=True):
+        """Forward the pixels through the model and compute the reward."""
 
-  def step(self, action):
-    obs, env_reward, done, info = self.env.step(action)
-    # We'll keep the original env reward in the info dict in case the user would
-    # like to use it in conjunction with the learned reward.
-    info["env_reward"] = env_reward
-    pixels = self._render_obs()
-    learned_reward = self._get_reward_from_image(pixels)
-    return obs, learned_reward, done, info
+    def step(self, action):
+        obs, env_reward, done, info = self.env.step(action)
+        # We'll keep the original env reward in the info dict in case the user would
+        # like to use it in conjunction with the learned reward.
+        info["env_reward"] = env_reward
+        pixels = self._render_obs()
+        learned_reward = self._get_reward_from_image(pixels)
+        return obs, learned_reward, done, info
+
+    def peak_reward(self, image):
+        return self._get_reward_from_image(image, to_tensor=False)
 
 
 class DistanceToGoalLearnedVisualReward(LearnedVisualReward):
-  """Replace the environment reward with distances in embedding space."""
+    """Replace the environment reward with distances in embedding space."""
 
-  def __init__(
-      self,
-      goal_emb,
-      distance_scale = 1.0,
-      **base_kwargs,
-  ):
-    """Constructor.
+    def __init__(
+            self,
+            goal_emb,
+            distance_scale=1.0,
+            **base_kwargs,
+    ):
+        """Constructor.
 
     Args:
       goal_emb: The goal embedding.
@@ -303,25 +311,136 @@ class DistanceToGoalLearnedVisualReward(LearnedVisualReward):
         that of the goal state. Set to `1.0` by default.
       **base_kwargs: Base keyword arguments.
     """
-    super().__init__(**base_kwargs)
+        super().__init__(**base_kwargs)
 
-    self._goal_emb = np.atleast_2d(goal_emb)
-    self._distance_scale = distance_scale
+        self._goal_emb = np.atleast_2d(goal_emb)
+        self._distance_scale = distance_scale
 
-  def _get_reward_from_image(self, image):
-    """Forward the pixels through the model and compute the reward."""
-    image_tensor = self._to_tensor(image)
-    emb = self._model.infer(image_tensor).numpy().embs
-    dist = -1.0 * np.linalg.norm(emb - self._goal_emb)
-    dist *= self._distance_scale
-    return dist
+    def _get_reward_from_image(self, image, to_tensor=True):
+        """Forward the pixels through the model and compute the reward."""
+        image_tensor = self._to_tensor(image) if to_tensor else image
+        emb = self._model.infer(image_tensor).numpy().embs
+        dist = -1.0 * np.linalg.norm(emb - self._goal_emb)
+        dist *= self._distance_scale
+        return dist
 
 
 class GoalClassifierLearnedVisualReward(LearnedVisualReward):
-  """Replace the environment reward with the output of a goal classifier."""
+    """Replace the environment reward with the output of a goal classifier."""
 
-  def _get_reward_from_image(self, image):
-    """Forward the pixels through the model and compute the reward."""
-    image_tensor = self._to_tensor(image)
-    prob = torch.sigmoid(self._model.infer(image_tensor).embs)
-    return prob.item()
+    def _get_reward_from_image(self, image, to_tensor=True):
+        """Forward the pixels through the model and compute the reward."""
+        image_tensor = self._to_tensor(image) if to_tensor else image
+        prob = torch.sigmoid(self._model.infer(image_tensor).embs)
+        return prob.item()
+
+
+"""
+C.M. -- Create a Reward Wrapper that takes in both an embedding model and a reward prediction model based
+on the embedding
+"""
+
+
+class InferredFromEmbeddingReward(LearnedVisualReward):
+    def __init__(
+            self,
+            expiriment_dir,
+            **base_kwargs,
+    ):
+        """Constructor.
+
+    Args:
+      reward_network: A path to a pretrained reward network of type PreferenceRewardPredictor.
+      goal_examples_path: A path to a folder containing goal examples
+      embedding_size: The size of the embedding model
+      **base_kwargs: Base keyword arguments.
+    """
+        super().__init__(**base_kwargs)
+
+        device = self._device
+
+        self.goal_embedding = self.calculate_goal_embedding(expiriment_dir)
+        self.reward_predictor = Resnet18LinearEncoderNet(
+            len(self.goal_embedding),
+            num_ctx_frames=1,
+            normalize_embeddings=False,
+            learnable_temp=False,
+        ).to(device)
+        # self.reward_predictor.eval()
+
+        try:
+            self.kappa = utils.extract_kappa_from_exp(expiriment_dir)
+        except Exception as e:
+            self.kappa = 1.0
+            warnings.warn(f"A Normalization constant could not be extracted for the experiment. See exception: {e}")
+
+        checkpoint_dir = os.path.join(expiriment_dir, "checkpoints")
+        checkpoint_manager = CheckpointManager(
+            checkpoint_dir,
+            model=self.reward_predictor,
+        )
+        i = checkpoint_manager.restore_or_initialize()
+
+        if i == 0:
+            raise Exception(
+                f"Expected folder {expiriment_dir} to contain a valid checkpoint for model, but checkpoint file could not be loaded")
+
+    def _get_reward_from_image(self, image, to_tensor=True):
+        """Forward the pixels through the model and compute the reward."""
+        image_tensor = self._to_tensor(image) if to_tensor else image
+        embs = self.reward_predictor.infer(image_tensor).numpy().embs
+        dist_to_goal = -(1.0 / self.kappa) * (np.linalg.norm(embs - self.goal_embedding))
+        return dist_to_goal
+
+    def calculate_goal_embedding(self, exp_dir, device="cuda"):
+        goal_file = os.path.join(exp_dir, "goal_embedding.csv")
+        goal = np.loadtxt(goal_file, delimiter=',')
+        return torch.tensor(goal).cpu().numpy()
+
+
+class RLHFInferredReward(LearnedVisualReward):
+    def __init__(
+            self,
+            expiriment_dir,
+            **base_kwargs,
+    ):
+        """Constructor.
+
+    Args:
+      reward_network: A path to a pretrained reward network of type PreferenceRewardPredictor.
+      goal_examples_path: A path to a folder containing goal examples
+      embedding_size: The size of the embedding model
+      **base_kwargs: Base keyword arguments.
+    """
+        super().__init__(**base_kwargs)
+
+        self.reward_predictor = ReinforcementLearningHumanFeedback(
+            num_ctx_frames=1,
+            normalize_embeddings=False,
+            learnable_temp=False,
+        ).to(self._device)
+        # self.reward_predictor.eval()
+
+        try:
+            self.kappa = utils.extract_kappa_from_exp(expiriment_dir)
+        except Exception as e:
+            self.kappa = 1.0
+            warnings.warn(f"A Normalization constant could not be extracted for the experiment. See exception: {e}")
+
+        checkpoint_dir = os.path.join(expiriment_dir, "checkpoints")
+        checkpoint_manager = CheckpointManager(
+            checkpoint_dir,
+            model=self.reward_predictor,
+        )
+        i = checkpoint_manager.restore_or_initialize()
+
+        if i == 0:
+            raise Exception(
+                f"Expected folder {expiriment_dir} to contain a valid checkpoint for model, but checkpoint file could not be loaded")
+
+    def _get_reward_from_image(self, image, to_tensor=True):
+        """Forward the pixels through the model and compute the reward."""
+        image_tensor = self._to_tensor(image) if to_tensor else image
+        embs = self.reward_predictor.infer(image_tensor).numpy().embs
+        return embs[0][0]
+

@@ -22,10 +22,11 @@ from configs.constants import XMAGICAL_EMBODIMENT_TO_ENV_NAME
 from ml_collections import config_flags
 import utils
 from xmagical.utils import KeyboardEnvInteractor
+import matplotlib.pyplot as plt
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_enum("embodiment", "longstick", EMBODIMENTS,
+flags.DEFINE_enum("embodiment", "mediumstick", EMBODIMENTS,
                   "The agent embodiment.")
 flags.DEFINE_boolean(
     "exit_on_done", True,
@@ -40,41 +41,59 @@ config_flags.DEFINE_config_file(
 
 
 def main(_):
-  env_name = XMAGICAL_EMBODIMENT_TO_ENV_NAME[FLAGS.embodiment]
-  env = utils.make_env(env_name, seed=0)
+    env_name = XMAGICAL_EMBODIMENT_TO_ENV_NAME[FLAGS.embodiment]
+    env = utils.make_env(env_name, seed=3)
 
-  # Reward learning wrapper.
-  if FLAGS.config.reward_wrapper.pretrained_path is not None:
-    env = utils.wrap_learned_reward(env, FLAGS.config)
+    # Reward learning wrapper.
+    if FLAGS.config.reward_wrapper.type is not None:
+        env = utils.wrap_learned_reward(env, FLAGS.config)
 
-  viewer = KeyboardEnvInteractor(action_dim=env.action_space.shape[0])
+    viewer = KeyboardEnvInteractor(action_dim=env.action_space.shape[0])
 
-  env.reset()
-  obs = env.render("rgb_array")
-  viewer.imshow(obs)
+    LIVE_REWARD = True
+    MAX_STEPS = 1000
 
-  i = [0]
-  rews = []
+    env.reset()
+    obs = env.render("rgb_array")
+    viewer.imshow(obs)
 
-  def step(action):
-    obs, rew, done, info = env.step(action)
-    rews.append(rew)
-    if obs.ndim != 3:
-      obs = env.render("rgb_array")
-    if done:
-      print(f"Done, score {info['eval_score']:.2f}/1.00")
-      print("Episode metrics: ")
-      for k, v in info["episode"].items():
-        print(f"\t{k}: {v}")
-      if FLAGS.exit_on_done:
-        return
-    i[0] += 1
-    return obs
+    i = [0]
+    rews = []
+    ONLY_UPDATE_PLOT_ON_STEP = True
 
-  viewer.run_loop(step)
 
-  utils.plot_reward(rews)
+    if LIVE_REWARD:
+        plt.ion()
+
+    def step(action):
+        print(action)
+        obs, rew, done, info = env.step(action)
+        if not ONLY_UPDATE_PLOT_ON_STEP or sum(action) != 0.0:
+            rews.append(rew)
+        if LIVE_REWARD:
+            plt.clf()
+            plt.plot(rews)
+            plt.pause(0.01)
+            plt.show()
+        if obs.ndim != 3:
+            obs = env.render("rgb_array")
+        # if done:
+        #     print(f"Done, score {info['eval_score']:.2f}/1.00")
+        #     print("Episode metrics: ")
+        #     for k, v in info["episode"].items():
+        #         print(f"\t{k}: {v}")
+        #     if FLAGS.exit_on_done:
+        #         return
+        if i[0] > MAX_STEPS:
+            return
+        i[0] += 1
+        return obs
+
+    viewer.run_loop(step)
+    plt.ioff()
+
+    utils.plot_reward(rews)
 
 
 if __name__ == "__main__":
-  app.run(main)
+    app.run(main)

@@ -20,11 +20,16 @@ Adapted from https://github.com/ikostrikov/jaxrl.
 
 import abc
 import collections
+import warnings
 from typing import Optional, Tuple
 
 import numpy as np
 import torch
-from xirl.models import SelfSupervisedModel
+
+import utils
+from xirl.models import SelfSupervisedModel, Resnet18LinearEncoderNet
+import os
+from torchkit import CheckpointManager
 
 import cv2
 
@@ -35,16 +40,16 @@ ModelType = SelfSupervisedModel
 
 
 class ReplayBuffer:
-  """Buffer to store environment transitions."""
+    """Buffer to store environment transitions."""
 
-  def __init__(
-      self,
-      obs_shape,
-      action_shape,
-      capacity,
-      device,
-  ):
-    """Constructor.
+    def __init__(
+            self,
+            obs_shape,
+            action_shape,
+            capacity,
+            device,
+    ):
+        """Constructor.
 
     Args:
       obs_shape: The dimensions of the observation space.
@@ -52,75 +57,75 @@ class ReplayBuffer:
       capacity: The maximum length of the replay buffer.
       device: The torch device wherein to return sampled transitions.
     """
-    self.capacity = capacity
-    self.device = device
+        self.capacity = capacity
+        self.device = device
 
-    obs_dtype = np.float32 if len(obs_shape) == 1 else np.uint8
-    self.obses = self._empty_arr(obs_shape, obs_dtype)
-    self.next_obses = self._empty_arr(obs_shape, obs_dtype)
-    self.actions = self._empty_arr(action_shape, np.float32)
-    self.rewards = self._empty_arr((1,), np.float32)
-    self.masks = self._empty_arr((1,), np.float32)
+        obs_dtype = np.float32 if len(obs_shape) == 1 else np.uint8
+        self.obses = self._empty_arr(obs_shape, obs_dtype)
+        self.next_obses = self._empty_arr(obs_shape, obs_dtype)
+        self.actions = self._empty_arr(action_shape, np.float32)
+        self.rewards = self._empty_arr((1,), np.float32)
+        self.masks = self._empty_arr((1,), np.float32)
 
-    self.idx = 0
-    self.size = 0
+        self.idx = 0
+        self.size = 0
 
-  def _empty_arr(self, shape, dtype):
-    """Creates an empty array of specified shape and type."""
-    return np.empty((self.capacity, *shape), dtype=dtype)
+    def _empty_arr(self, shape, dtype):
+        """Creates an empty array of specified shape and type."""
+        return np.empty((self.capacity, *shape), dtype=dtype)
 
-  def _to_tensor(self, arr):
-    """Convert an ndarray to a torch Tensor and move it to the device."""
-    return torch.as_tensor(arr, device=self.device, dtype=torch.float32)
+    def _to_tensor(self, arr):
+        """Convert an ndarray to a torch Tensor and move it to the device."""
+        return torch.as_tensor(arr, device=self.device, dtype=torch.float32)
 
-  def insert(
-      self,
-      obs,
-      action,
-      reward,
-      next_obs,
-      mask,
-  ):
-    """Insert an episode transition into the buffer."""
-    np.copyto(self.obses[self.idx], obs)
-    np.copyto(self.actions[self.idx], action)
-    np.copyto(self.rewards[self.idx], reward)
-    np.copyto(self.next_obses[self.idx], next_obs)
-    np.copyto(self.masks[self.idx], mask)
+    def insert(
+            self,
+            obs,
+            action,
+            reward,
+            next_obs,
+            mask,
+    ):
+        """Insert an episode transition into the buffer."""
+        np.copyto(self.obses[self.idx], obs)
+        np.copyto(self.actions[self.idx], action)
+        np.copyto(self.rewards[self.idx], reward)
+        np.copyto(self.next_obses[self.idx], next_obs)
+        np.copyto(self.masks[self.idx], mask)
 
-    self.idx = (self.idx + 1) % self.capacity
-    self.size = min(self.size + 1, self.capacity)
+        self.idx = (self.idx + 1) % self.capacity
+        self.size = min(self.size + 1, self.capacity)
 
-  def sample(self, batch_size):
-    """Sample an episode transition from the buffer."""
-    idxs = np.random.randint(low=0, high=self.size, size=(batch_size,))
+    def sample(self, batch_size):
+        """Sample an episode transition from the buffer."""
+        idxs = np.random.randint(low=0, high=self.size, size=(batch_size,))
 
-    return Batch(
-        obses=self._to_tensor(self.obses[idxs]),
-        actions=self._to_tensor(self.actions[idxs]),
-        rewards=self._to_tensor(self.rewards[idxs]),
-        next_obses=self._to_tensor(self.next_obses[idxs]),
-        masks=self._to_tensor(self.masks[idxs]),
-    )
+        return Batch(
+            obses=self._to_tensor(self.obses[idxs]),
+            actions=self._to_tensor(self.actions[idxs]),
+            rewards=self._to_tensor(self.rewards[idxs]),
+            next_obses=self._to_tensor(self.next_obses[idxs]),
+            masks=self._to_tensor(self.masks[idxs]),
+        )
 
-  def __len__(self):
-    return self.size
+    def __len__(self):
+        return self.size
 
 
 class ReplayBufferLearnedReward(abc.ABC, ReplayBuffer):
-  """Buffer that replaces the environment reward with a learned one.
+    """Buffer that replaces the environment reward with a learned one.
 
   Subclasses should implement the `_get_reward_from_image` method.
   """
 
-  def __init__(
-      self,
-      model,
-      res_hw = None,
-      batch_size = 64,
-      **base_kwargs,
-  ):
-    """Constructor.
+    def __init__(
+            self,
+            model,
+            res_hw=None,
+            batch_size=64,
+            **base_kwargs,
+    ):
+        """Constructor.
 
     Args:
       model: A model that ingests RGB frames and returns embeddings. Should be a
@@ -131,91 +136,176 @@ class ReplayBufferLearnedReward(abc.ABC, ReplayBuffer):
         learned reward. Controls the size of the staging lists.
       **base_kwargs: Base keyword arguments.
     """
-    super().__init__(**base_kwargs)
+        super().__init__(**base_kwargs)
 
-    self.model = model
-    self.res_hw = res_hw
-    self.batch_size = batch_size
+        self.model = model
+        self.res_hw = res_hw
+        self.batch_size = batch_size
 
-    self._reset_staging()
+        self._reset_staging()
 
-  def _reset_staging(self):
-    self.obses_staging = []
-    self.next_obses_staging = []
-    self.actions_staging = []
-    self.rewards_staging = []
-    self.masks_staging = []
-    self.pixels_staging = []
+    def _reset_staging(self):
+        self.obses_staging = []
+        self.next_obses_staging = []
+        self.actions_staging = []
+        self.rewards_staging = []
+        self.masks_staging = []
+        self.pixels_staging = []
 
-  def _pixel_to_tensor(self, arr):
-    arr = torch.from_numpy(arr).permute(2, 0, 1).float()[None, None, Ellipsis]
-    arr = arr / 255.0
-    arr = arr.to(self.device)
-    return arr
+    def _pixel_to_tensor(self, arr):
+        arr = torch.from_numpy(arr).permute(2, 0, 1).float()[None, None, Ellipsis]
+        arr = arr / 255.0
+        arr = arr.to(self.device)
+        return arr
 
-  @abc.abstractmethod
-  def _get_reward_from_image(self):
-    """Forward the pixels through the model and compute the reward."""
+    @abc.abstractmethod
+    def _get_reward_from_image(self):
+        """Forward the pixels through the model and compute the reward."""
 
-  def insert(
-      self,
-      obs,
-      action,
-      reward,
-      next_obs,
-      mask,
-      pixels,
-  ):
-    if len(self.obses_staging) < self.batch_size:
-      self.obses_staging.append(obs)
-      self.next_obses_staging.append(next_obs)
-      self.actions_staging.append(action)
-      self.rewards_staging.append(reward)
-      self.masks_staging.append(mask)
-      if self.res_hw is not None:
-        h, w = self.res_hw
-        pixels = cv2.resize(pixels, dsize=(w, h), interpolation=cv2.INTER_CUBIC)
-      self.pixels_staging.append(pixels)
-    else:
-      for obs_s, action_s, reward_s, next_obs_s, mask_s in zip(
-          self.obses_staging,
-          self.actions_staging,
-          self._get_reward_from_image(),
-          self.next_obses_staging,
-          self.masks_staging,
-      ):
-        super().insert(obs_s, action_s, reward_s, next_obs_s, mask_s)
-      self._reset_staging()
+    def insert(
+            self,
+            obs,
+            action,
+            reward,
+            next_obs,
+            mask,
+            pixels,
+    ):
+        if len(self.obses_staging) < self.batch_size:
+            self.obses_staging.append(obs)
+            self.next_obses_staging.append(next_obs)
+            self.actions_staging.append(action)
+            self.rewards_staging.append(reward)
+            self.masks_staging.append(mask)
+            if self.res_hw is not None:
+                h, w = self.res_hw
+                pixels = cv2.resize(pixels, dsize=(w, h), interpolation=cv2.INTER_CUBIC)
+            self.pixels_staging.append(pixels)
+        else:
+            for obs_s, action_s, reward_s, next_obs_s, mask_s in zip(
+                    self.obses_staging,
+                    self.actions_staging,
+                    self._get_reward_from_image(),
+                    self.next_obses_staging,
+                    self.masks_staging,
+            ):
+                super().insert(obs_s, action_s, reward_s, next_obs_s, mask_s)
+            self._reset_staging()
 
 
 class ReplayBufferDistanceToGoal(ReplayBufferLearnedReward):
-  """Replace the environment reward with distances in embedding space."""
+    """Replace the environment reward with distances in embedding space."""
 
-  def __init__(
-      self,
-      goal_emb,
-      distance_scale = 1.0,
-      **base_kwargs,
-  ):
-    super().__init__(**base_kwargs)
+    def __init__(
+            self,
+            goal_emb,
+            distance_scale=1.0,
+            **base_kwargs,
+    ):
+        super().__init__(**base_kwargs)
 
-    self.goal_emb = goal_emb
-    self.distance_scale = distance_scale
+        self.goal_emb = goal_emb
+        self.distance_scale = distance_scale
 
-  def _get_reward_from_image(self):
-    image_tensors = [self._pixel_to_tensor(i) for i in self.pixels_staging]
-    image_tensors = torch.cat(image_tensors, dim=1)
-    embs = self.model.infer(image_tensors).numpy().embs
-    dists = -1.0 * np.linalg.norm(embs - self.goal_emb, axis=-1)
-    dists *= self.distance_scale
-    return dists
+    def _get_reward_from_image(self):
+        image_tensors = [self._pixel_to_tensor(i) for i in self.pixels_staging]
+        image_tensors = torch.cat(image_tensors, dim=1)
+        embs = self.model.infer(image_tensors).numpy().embs
+        dists = -1.0 * np.linalg.norm(embs - self.goal_emb, axis=-1)
+        dists *= self.distance_scale
+        return dists
 
 
 class ReplayBufferGoalClassifier(ReplayBufferLearnedReward):
-  """Replace the environment reward with the output of a goal classifier."""
+    """Replace the environment reward with the output of a goal classifier."""
 
-  def _get_reward_from_image(self):
-    image_tensors = [self._pixel_to_tensor(i) for i in self.pixels_staging]
-    image_tensors = torch.cat(image_tensors, dim=1)
-    prob = torch.sigmoid(self.model.infer(image_tensors).embs)
-    return prob.item()
+    def _get_reward_from_image(self):
+        image_tensors = [self._pixel_to_tensor(i) for i in self.pixels_staging]
+        image_tensors = torch.cat(image_tensors, dim=1)
+        prob = torch.sigmoid(self.model.infer(image_tensors).embs)
+        return prob.tolist()
+
+
+class ReplayBufferLearnedReward(ReplayBufferLearnedReward):
+    """Replace the environment reward with distances in embedding space."""
+
+    def __init__(
+            self,
+            expiriment_dir,
+            **base_kwargs,
+    ):
+        super().__init__(**base_kwargs)
+
+        self.goal_embedding = self.calculate_goal_embedding(expiriment_dir)
+        self.reward_predictor = Resnet18LinearEncoderNet(
+            len(self.goal_embedding),
+            num_ctx_frames=1,
+            normalize_embeddings=False,
+            learnable_temp=False,
+        ).to(base_kwargs["device"])
+        # self.reward_predictor.eval()
+
+        try:
+            self.kappa = utils.extract_kappa_from_exp(expiriment_dir)
+        except Exception as e:
+            self.kappa = 1.0
+            warnings.warn(f"A Normalization constant could not be extracted for the experiment. See exception: {e}")
+
+        checkpoint_dir = os.path.join(expiriment_dir, "checkpoints")
+        checkpoint_manager = CheckpointManager(
+            checkpoint_dir,
+            model=self.reward_predictor,
+        )
+        i = checkpoint_manager.restore_or_initialize()
+
+        if i == 0:
+            raise Exception(
+                f"Expected folder {expiriment_dir} to contain a valid checkpoint for model, but checkpoint file could not be loaded")
+
+    def _get_reward_from_image(self):
+        """Forward the pixels through the model and compute the reward."""
+        image_tensors = [self._pixel_to_tensor(i) for i in self.pixels_staging]
+        image_tensors = torch.cat(image_tensors, dim=1)
+        embs = self.reward_predictor.infer(image_tensors).numpy().embs
+        dists = -(1.0 / self.kappa) * np.linalg.norm(embs - self.goal_embedding, axis=-1)
+        return dists
+
+    def calculate_goal_embedding(self, exp_dir, device="cuda"):
+        goal_file = os.path.join(exp_dir, "goal_embedding.csv")
+        goal = np.loadtxt(goal_file, delimiter=',')
+        return torch.tensor(goal).cpu().numpy()
+
+class ReplayBufferRewardLearningHumanFeedback(ReplayBufferLearnedReward):
+    """Replace the environment reward with distances in embedding space."""
+
+    def __init__(
+            self,
+            expiriment_dir,
+            **base_kwargs,
+    ):
+        super().__init__(**base_kwargs)
+
+        self.reward_predictor = Resnet18LinearEncoderNet(
+            num_ctx_frames=1,
+            normalize_embeddings=False,
+            learnable_temp=False,
+        ).to(base_kwargs["device"])
+        # self.reward_predictor.eval()
+
+        checkpoint_dir = os.path.join(expiriment_dir, "checkpoints")
+        checkpoint_manager = CheckpointManager(
+            checkpoint_dir,
+            model=self.reward_predictor,
+        )
+        i = checkpoint_manager.restore_or_initialize()
+
+        if i == 0:
+            raise Exception(
+                f"Expected folder {expiriment_dir} to contain a valid checkpoint for model, but checkpoint file could not be loaded")
+
+    def _get_reward_from_image(self):
+        """Forward the pixels through the model and compute the reward."""
+        image_tensors = [self._pixel_to_tensor(i) for i in self.pixels_staging]
+        image_tensors = torch.cat(image_tensors, dim=1)
+        embs = self.reward_predictor.infer(image_tensors).numpy().embs
+        return embs

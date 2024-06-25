@@ -16,7 +16,7 @@
 """Default SAC config values."""
 
 import ml_collections
-
+import os
 
 def get_config():
   """Returns default config."""
@@ -33,7 +33,9 @@ def get_config():
   # ================================================= #
   # Main parameters.
   # ================================================= #
-  config.save_dir = "/tmp/xirl/rl_runs/"
+  config.save_dir = os.path.expanduser("~/Documents/Xpref/pretrain_runs/")
+  ### changing save_dir
+  #config.save_dir = "/home/masters3/Documents/Research/Xpref/rl/run_0.33/0/"
 
   # Set this to True to allow CUDA to find the best convolutional algorithm to
   # use for the given parameters. When False, cuDNN will deterministically
@@ -50,9 +52,12 @@ def get_config():
   config.frame_stack = 3
 
   config.reward_wrapper = ml_collections.ConfigDict()
-  config.reward_wrapper.pretrained_path = ""
-  # Can be one of ['distance_to_goal', 'goal_classifier'].
+
+  # Can be one of ['distance_to_goal', 'goal_classifier', 'reward_prediction_from_prefs', 'RLHF', None].
   config.reward_wrapper.type = "distance_to_goal"
+
+  # Either a TCC model (if 'distance_to_goal') or an XPrefs model (if 'reward_prediction_from_prefs')
+  config.reward_wrapper.pretrained_path = os.path.expanduser("~/Documents/Xpref/pretrain_runs/XTriplets")
 
   # ================================================= #
   # Training parameters.
@@ -110,5 +115,7 @@ def get_config():
   config.sac.actor.log_std_bounds = [-5, 2]
 
   # ================================================= #
+
+
 
   return config

@@ -16,7 +16,7 @@
 """Launch script for pre-training representations."""
 
 import os.path as osp
-
+import time
 from absl import app
 from absl import flags
 from absl import logging
@@ -34,7 +34,7 @@ from xirl import common
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_string("experiment_name", None, "Experiment name.")
+flags.DEFINE_string("experiment_name", str(time.time()), "Experiment name.")
 flags.DEFINE_boolean("resume", False, "Whether to resume training.")
 flags.DEFINE_string("device", "cuda:0", "The compute device.")
 flags.DEFINE_boolean("raw_imagenet", False, "")
@@ -51,6 +51,7 @@ def main(_):
   # Make sure we have a valid config that inherits all the keys defined in the
   # base config.
   validate_config(FLAGS.config, mode="pretrain")
+
 
   config = FLAGS.config
   exp_dir = osp.join(config.root_dir, FLAGS.experiment_name)
@@ -88,6 +89,11 @@ def main(_):
       trainer,
       eval_manager,
   ) = common.get_factories(config, device)
+
+  # Log the Model Parameter Info
+  num_params = sum(p.numel() for p in model.parameters())  # Total parameters
+  num_trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)  # Trainable parameters
+  logging.info(f"Model Total Params: {num_params}, Trainable Params: {num_trainable_params}")
 
   # Create checkpoint manager.
   checkpoint_dir = osp.join(exp_dir, "checkpoints")
@@ -168,5 +174,5 @@ def main(_):
 
 
 if __name__ == "__main__":
-  flags.mark_flag_as_required("experiment_name")
+  # flags.mark_flag_as_required("experiment_name")
   app.run(main)

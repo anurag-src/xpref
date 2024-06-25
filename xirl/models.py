@@ -27,7 +27,8 @@ import torch.nn.functional as F
 from torchvision import models
 from torchvision.models.resnet import BasicBlock
 from torchvision.models.resnet import ResNet
-from torchvision.models.utils import load_state_dict_from_url
+#from torchvision.models.utils import load_state_dict_from_url
+from torch.hub import load_state_dict_from_url
 
 
 @dataclasses.dataclass
@@ -87,6 +88,9 @@ class SelfSupervisedModel(abc.ABC, nn.Module):
     if learnable_temp:
       self.logit_scale = nn.Parameter(torch.ones([]))
 
+  def tensor_contains_nan(self, tensor):
+    return torch.isnan(tensor).any()
+
   def forward(self, x):
     """Forward the video frames through the network.
 
@@ -97,6 +101,7 @@ class SelfSupervisedModel(abc.ABC, nn.Module):
     Returns:
       An instance of SelfSupervisedOutput.
     """
+
     batch_size, t, c, h, w = x.shape
     x_flat = x.view((batch_size * t, c, h, w))
     feats = self.backbone(x_flat)
@@ -109,6 +114,7 @@ class SelfSupervisedModel(abc.ABC, nn.Module):
       embs = logit_scale * embs
     embs = embs.view((batch_size, t, -1))
     feats = feats.view((batch_size, t, -1))
+
     return SelfSupervisedOutput(frames=x, feats=feats, embs=embs)
 
   @torch.no_grad()
@@ -126,7 +132,8 @@ class SelfSupervisedModel(abc.ABC, nn.Module):
       out = []
       for i in range(math.ceil(x.shape[1] / effective_bs)):
         sub_frames = x[:, i * effective_bs:(i + 1) * effective_bs]
-        out.append(self.forward(sub_frames).cpu())
+        embs = self.forward(sub_frames).cpu()
+        out.append(embs)
       out = SelfSupervisedOutput.merge(out)
     else:
       out = self.forward(x).cpu()
@@ -149,6 +156,15 @@ class Resnet18LinearEncoderNet(SelfSupervisedModel):
     self.encoder = nn.Linear(num_ftrs, embedding_size)
 
 
+class Resnet18FrozenBackbone(Resnet18LinearEncoderNet):
+  """A resnet18 backbone with a linear encoder head."""
+
+  def __init__(self, embedding_size, *args, **kwargs):
+    super().__init__(embedding_size, *args, **kwargs)
+    for param in self.backbone.parameters():
+      param.requires_grad = False
+
+
 class GoalClassifier(SelfSupervisedModel):
   """A resnet18 backbone with a binary classification head."""
 
@@ -164,6 +180,31 @@ class GoalClassifier(SelfSupervisedModel):
     # Classification head.
     self.encoder = nn.Linear(num_ftrs, 1)
 
+#### Reward Predictor Class
+class PreferenceRewardPredictor(nn.Module):
+  def __init__(self, num_features = 32):
+    super().__init__()
+    self.predictor = nn.Sequential(
+      nn.Linear(num_features, 1)
+    )
+  def forward(self, x):
+    return self.predictor(x)
+
+
+class ReinforcementLearningHumanFeedback(SelfSupervisedModel):
+  """A resnet18 backbone with a binary classification head."""
+
+  def __init__(self, *args, **kwargs):
+    super().__init__(*args, **kwargs)
+
+    # Visual backbone.
+    resnet = models.resnet18(pretrained=True)
+    num_ftrs = resnet.fc.in_features
+    layers_ = list(resnet.children())[:-1]
+    self.backbone = nn.Sequential(*layers_)
+
+    # Classification head.
+    self.encoder = nn.Linear(num_ftrs, 1)
 
 class Resnet18RawImageNetFeaturesNet(SelfSupervisedModel):
   """A resnet18 backbone with an identity encoder head."""
@@ -179,6 +220,10 @@ class Resnet18RawImageNetFeaturesNet(SelfSupervisedModel):
     # Identity encoder.
     self.encoder = nn.Identity()
 
+
+"""
+A model designed specifically for the intake of triplet batches
+"""
 
 class Upsampling(nn.Module):
   """Unet upsampling adapted from [1].
